@@ -9,7 +9,7 @@ export default function Home() {
           $ whoami
         </div>
         <h1 className="text-4xl font-bold text-white mb-4 leading-tight">
-          Joji Ortiz<br />
+          Joji<br />
           <span className="text-joji-green">+ Claw 🦞</span>
         </h1>
         <p className="text-gray-400 text-lg leading-relaxed max-w-2xl">

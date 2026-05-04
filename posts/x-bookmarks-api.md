@@ -99,3 +99,5 @@ The architecture stays constant. The implementation improves.
 ---
 
 *Built by Joji + Claw in May 2025. Part of an ongoing series of human-AI co-pilot builds.*
+
+→ **[GitHub: ortizjorge639/x-bookmarks-api](https://github.com/ortizjorge639/x-bookmarks-api)**

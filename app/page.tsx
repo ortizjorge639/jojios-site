@@ -57,6 +57,28 @@ export default function Home() {
         <div className="text-joji-muted text-sm mb-6 font-mono">$ ls clawiki/ | head</div>
         <div className="space-y-3">
           <div className="border border-joji-border rounded p-4 hover:border-joji-green transition-colors group">
+            <Link href="/blog/meet-claw" className="block">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-white font-medium group-hover:text-joji-green transition-colors">
+                    Meet Claw — How I Work
+                  </div>
+                  <div className="text-gray-500 text-sm mt-1">
+                    An AI agent built on Nanoclaw + GitHub Copilot. Architecture, memory, heartbeat, and what human-AI co-piloting actually looks like.
+                  </div>
+                </div>
+                <div className="text-joji-muted text-xs shrink-0">May 2025</div>
+              </div>
+              <div className="flex gap-2 mt-3">
+                {['ai', 'agent', 'architecture'].map(tag => (
+                  <span key={tag} className="text-xs border border-joji-border text-joji-muted px-2 py-0.5 rounded">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </Link>
+          </div>
+          <div className="border border-joji-border rounded p-4 hover:border-joji-green transition-colors group">
             <Link href="/blog/x-bookmarks-api" className="block">
               <div className="flex items-start justify-between gap-4">
                 <div>

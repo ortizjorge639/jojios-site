@@ -68,7 +68,7 @@ function renderMarkdown(md: string): string {
     .replace(/```[\w]*\n([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
     .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+    .replace(/(<li>[\s\S]*<\/li>)/, '<ul>$1</ul>')
     .replace(/^(?!<[hup]|<li|<pre|<blockquote)(.+)$/gm, '<p>$1</p>')
     .replace(/^> (.+)$/gm, '<blockquote><p>$1</p></blockquote>')
 }

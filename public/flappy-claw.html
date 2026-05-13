@@ -522,65 +522,97 @@ function drawTutorialScreen() {
 
 // ── Draw: Death Screen ───────────────────────────────────────────
 function drawDeadScreen() {
-  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
   ctx.fillRect(0, 0, BASE_W, BASE_H);
 
-  const px = BASE_W / 2 - 90, py = BASE_H / 2 - 75;
+  const PW = 188, PH = 200;
+  const px = BASE_W / 2 - PW / 2;
+  const py = BASE_H / 2 - PH / 2 - 10;
 
+  // Panel
   ctx.fillStyle = C.panelBg;
   ctx.strokeStyle = C.accent;
   ctx.lineWidth = 2;
   ctx.shadowColor = C.accent;
-  ctx.shadowBlur = 10;
+  ctx.shadowBlur = 12;
   ctx.beginPath();
-  ctx.roundRect(px, py, 180, 140, 6);
+  ctx.roundRect(px, py, PW, PH, 8);
   ctx.fill();
   ctx.stroke();
   ctx.shadowBlur = 0;
 
+  // Death title
   ctx.textAlign = 'center';
-  ctx.font = 'bold 14px monospace';
+  ctx.font = 'bold 15px monospace';
   ctx.fillStyle = C.deathRed;
-  ctx.fillText(AGENT_CONFIG.deathTitle, BASE_W / 2, py + 24);
+  ctx.shadowColor = C.deathRed;
+  ctx.shadowBlur = 6;
+  ctx.fillText(AGENT_CONFIG.deathTitle, BASE_W / 2, py + 26);
+  ctx.shadowBlur = 0;
 
-  ctx.font = '10px monospace';
-  ctx.fillStyle = 'rgba(255,64,64,0.6)';
-  ctx.fillText(AGENT_CONFIG.deathSubtitle, BASE_W / 2, py + 40);
+  // Death subtitle
+  ctx.font = '9px monospace';
+  ctx.fillStyle = 'rgba(255,80,80,0.6)';
+  ctx.fillText(AGENT_CONFIG.deathSubtitle, BASE_W / 2, py + 42);
 
+  // Divider
   ctx.strokeStyle = C.accentDim;
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(px + 10, py + 50);
-  ctx.lineTo(px + 170, py + 50);
+  ctx.moveTo(px + 12, py + 52);
+  ctx.lineTo(px + PW - 12, py + 52);
   ctx.stroke();
 
-  ctx.font = '10px monospace';
-  ctx.fillStyle = '#888';
-  ctx.fillText(AGENT_CONFIG.scoreLabel.toUpperCase(), BASE_W / 2 - 38, py + 68);
-  ctx.fillText('BEST', BASE_W / 2 + 44, py + 68);
+  // Score columns
+  const lx = BASE_W / 2 - 44, rx = BASE_W / 2 + 44;
+  ctx.font = '9px monospace';
+  ctx.fillStyle = '#666';
+  ctx.fillText(AGENT_CONFIG.scoreLabel.toUpperCase(), lx, py + 68);
+  ctx.fillText('BEST', rx, py + 68);
 
-  ctx.font = 'bold 22px monospace';
+  ctx.font = 'bold 26px monospace';
   ctx.fillStyle = C.score;
-  ctx.fillText(score, BASE_W / 2 - 38, py + 94);
+  ctx.shadowColor = C.score;
+  ctx.shadowBlur = 8;
+  ctx.fillText(score, lx, py + 100);
+  ctx.shadowBlur = 0;
   ctx.fillStyle = C.bestGold;
-  ctx.fillText(highScore, BASE_W / 2 + 44, py + 94);
+  ctx.fillText(highScore, rx, py + 100);
 
-  if (score > 0) {
-    const [, rank, col] = AGENT_CONFIG.ranks.find(([min]) => score >= min);
-    ctx.font = 'bold 18px monospace';
-    ctx.fillStyle = col;
-    ctx.shadowColor = col;
-    ctx.shadowBlur = 8;
-    ctx.fillText('[' + rank + ']', BASE_W / 2, py + 118);
+  // Rank badge
+  const [, rank, rankCol] = AGENT_CONFIG.ranks.find(([min]) => score >= min);
+  ctx.font = 'bold 16px monospace';
+  ctx.fillStyle = rankCol;
+  ctx.shadowColor = rankCol;
+  ctx.shadowBlur = 8;
+  ctx.fillText('[' + rank + ']', BASE_W / 2, py + 126);
+  ctx.shadowBlur = 0;
+
+  // Divider 2
+  ctx.strokeStyle = C.accentDim;
+  ctx.beginPath();
+  ctx.moveTo(px + 12, py + 138);
+  ctx.lineTo(px + PW - 12, py + 138);
+  ctx.stroke();
+
+  // New best indicator
+  if (score > 0 && score === highScore) {
+    ctx.font = 'bold 9px monospace';
+    ctx.fillStyle = C.bestGold;
+    ctx.shadowColor = C.bestGold;
+    ctx.shadowBlur = 6;
+    ctx.fillText('✦ NEW BEST ✦', BASE_W / 2, py + 154);
     ctx.shadowBlur = 0;
   }
 
+  // Restart prompt
   const pulse = Math.sin(frame * 0.1) * 0.4 + 0.6;
   ctx.globalAlpha = pulse;
   ctx.font = 'bold 11px monospace';
   ctx.fillStyle = C.score;
   ctx.shadowColor = C.score;
   ctx.shadowBlur = 6;
-  ctx.fillText(AGENT_CONFIG.restartPrompt, BASE_W / 2, py + 160);
+  ctx.fillText(AGENT_CONFIG.restartPrompt, BASE_W / 2, py + PH - 14);
   ctx.shadowBlur = 0;
   ctx.globalAlpha = 1;
 }

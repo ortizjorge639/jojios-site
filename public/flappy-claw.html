@@ -605,17 +605,24 @@ function drawDeadScreen() {
     ctx.shadowBlur = 0;
   }
 
-  // Restart prompt
-  const pulse = Math.sin(frame * 0.1) * 0.4 + 0.6;
-  ctx.globalAlpha = pulse;
-  ctx.font = 'bold 11px monospace';
-  ctx.fillStyle = C.score;
-  ctx.shadowColor = C.score;
-  ctx.shadowBlur = 6;
-  ctx.fillText(AGENT_CONFIG.restartPrompt, BASE_W / 2, py + PH - 14);
-  ctx.shadowBlur = 0;
-  ctx.globalAlpha = 1;
-}
+  // Restart prompt — only show after lockout
+  if (frame - deathFrame >= 60) {
+    const pulse = Math.sin(frame * 0.1) * 0.4 + 0.6;
+    ctx.globalAlpha = pulse;
+    ctx.font = 'bold 11px monospace';
+    ctx.fillStyle = C.score;
+    ctx.shadowColor = C.score;
+    ctx.shadowBlur = 6;
+    ctx.fillText(AGENT_CONFIG.restartPrompt, BASE_W / 2, py + PH - 14);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  } else {
+    // Show a brief "..." while locked
+    const dots = '.'.repeat(1 + Math.floor((frame - deathFrame) / 20) % 3);
+    ctx.font = '11px monospace';
+    ctx.fillStyle = 'rgba(100,100,100,0.6)';
+    ctx.fillText(dots, BASE_W / 2, py + PH - 14);
+  }
 
 // ── Particles ────────────────────────────────────────────────────
 function spawnParticles(x, y) {
@@ -668,7 +675,11 @@ function checkCollision() {
 function flap() {
   if (state === 'tutorial') { state = 'idle'; return; }
   if (state === 'idle') { state = 'playing'; bird.vy = FLAP_V; return; }
-  if (state === 'dead') { reset(); state = 'playing'; bird.vy = FLAP_V; return; }
+  if (state === 'dead') {
+    // Require at least 60 frames (~1s) on death screen before restart
+    if (frame - deathFrame < 60) return;
+    reset(); state = 'playing'; bird.vy = FLAP_V; return;
+  }
   if (state === 'playing') { bird.vy = FLAP_V; bird.flapFrame = 0; }
 }
 

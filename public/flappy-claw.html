@@ -37,7 +37,7 @@ function mkSave() {
 }
 function persist(P) { localStorage.setItem(SAVE_KEY, JSON.stringify(P)); }
 
-Skins // ── ──────────────────────────────────────────
+// ── Skins ────────────────────────────────────────────
 const SKINS = {
   default: { name:'CLAW',       c1:'#e84040', c2:'#cc2020', glow:null },
   ice:     { name:'ICE CLAW',   c1:'#40a8e8', c2:'#2080c0', glow:'#80d0ff', unlockLv:5  },
@@ -91,7 +91,7 @@ if (window.visualViewport) window.visualViewport.addEventListener('resize', resi
 const GRAV=0.28, BASE_FLAPV=-5.0, PW=52, BASE_PG=118, GH=72, GYL=H-GH, BX=70, PINT=88;
 const STARS = Array.from({length:40}, ()=>({ x:Math.random()*W|0, y:Math.random()*(GYL*0.9)|0, b:Math.random()*8|0 }));
 
-State // ── ────────────────────────────────────────
+// ── State ────────────────────────────────────────────
 let state = 'home';
 let P = mkSave();
 let frame=0;

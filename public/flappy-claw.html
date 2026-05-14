@@ -343,7 +343,88 @@ function hitBtn(id) {
   return tapPos.x>=r.x&&tapPos.x<=r.x+r.w&&tapPos.y>=r.y&&tapPos.y<=r.y+r.h;
 }
 
-// ── HOME SCREEN ──────────────────────────────────────
+// ── Tutorial ─────────────────────────────────────────
+const TUTORIAL_KEY = 'flappyClaw_tutDone';
+const TUTORIAL_SLIDES = [
+  {
+    title: 'TAP TO FLAP',
+    lines: ['Tap the screen','(or press SPACE)','to make Claw fly.','Dodge the pipes!'],
+    icon: '🦞',
+    color: '#00ff88',
+  },
+  {
+    title: 'LIVES',
+    lines: ['You have 3 lives.','Hit a pipe —','lose a life.','Lose all 3: GAME OVER.'],
+    icon: '❤️',
+    color: '#ff4444',
+  },
+  {
+    title: 'PIT STOPS',
+    lines: ['Every 10 pipes,','choose a power-up','card to help you','survive longer!'],
+    icon: '🛑',
+    color: '#ffd700',
+  },
+  {
+    title: 'BITS & SHOP',
+    lines: ['Earn BITS each pipe.','After game over,','spend them on','permanent upgrades!'],
+    icon: '💰',
+    color: '#ffd700',
+  },
+];
+let tutSlide=0, tutActive=false;
+
+function startTutorial() {
+  tutSlide=0; tutActive=true; state='tutorial';
+}
+function tutDone() {
+  localStorage.setItem(TUTORIAL_KEY,'1');
+  tutActive=false;
+  newRun(); state='playing'; bird.vy=BASE_FLAPV;
+}
+
+function drawTutorial() {
+  drawSky(); drawGround(frame*0.5);
+  drawBird(W/2, H/2-140+Math.sin(frame*0.05)*5, 0, frame, false, P.equippedSkin);
+  ctx.fillStyle='rgba(0,0,0,0.82)'; ctx.fillRect(0,0,W,H);
+
+  const slide=TUTORIAL_SLIDES[tutSlide];
+  const pw=240, ph=210, px=W/2-pw/2, py=H/2-ph/2-10;
+  drawPanel(px,py,pw,ph,'#060c10',slide.color);
+
+  // progress dots
+  for(let i=0;i<TUTORIAL_SLIDES.length;i++) {
+    ctx.fillStyle=i===tutSlide?slide.color:'#333';
+    ctx.fillRect(W/2-TUTORIAL_SLIDES.length*7+i*14, py+8, 8, 8);
+  }
+
+  // icon
+  ctx.font='28px serif'; ctx.textAlign='center';
+  ctx.fillText(slide.icon, W/2, py+46);
+
+  // title
+  pts(slide.title, W/2, py+74, 8, slide.color);
+
+  // lines
+  slide.lines.forEach((l,i)=>pt(l, W/2, py+100+i*18, 6, '#ccc'));
+
+  // nav buttons
+  const isLast = tutSlide===TUTORIAL_SLIDES.length-1;
+  if(tutSlide>0) drawBtn('tutBack','< BACK', px+10, py+ph-32, 80, 24, '#555', true);
+  drawBtn('tutNext', isLast?'PLAY! >':'NEXT >', px+pw-90, py+ph-32, 80, 24, slide.color, true);
+
+  pt((tutSlide+1)+'/'+TUTORIAL_SLIDES.length, W/2, py+ph-18, 5, '#444');
+  drawCRT();
+
+  if(tapPos) {
+    if(hitBtn('tutNext')) {
+      if(isLast) { tutDone(); }
+      else { tutSlide++; }
+    } else if(tutSlide>0&&hitBtn('tutBack')) { tutSlide--; }
+    tapPos=null;
+  }
+}
+
+
 const homeScrollY = { v:0 };
 function drawHome() {
   drawSky();
@@ -390,8 +471,10 @@ function drawHome() {
   drawCRT();
 
   if(tapPos) {
-    if(hitBtn('play')) { newRun(); state='playing'; bird.vy=BASE_FLAPV; }
-    else if(hitBtn('skin')) {
+    if(hitBtn('play')) {
+      if(!localStorage.getItem(TUTORIAL_KEY)) { startTutorial(); }
+      else { newRun(); state='playing'; bird.vy=BASE_FLAPV; }
+    } else if(hitBtn('skin')) {
       const unlocked=P.unlockedSkins;
       const cur=unlocked.indexOf(P.equippedSkin);
       P.equippedSkin=unlocked[(cur+1)%unlocked.length];
@@ -702,6 +785,7 @@ function loop() {
     drawGameOver();
   }
   else if(state==='home') { frame++; drawHome(); }
+  else if(state==='tutorial') { frame++; drawTutorial(); }
   else if(state==='shop') { drawShop(); }
   requestAnimationFrame(loop);
 }

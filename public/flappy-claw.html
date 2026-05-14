@@ -96,10 +96,11 @@ let state = 'home';
 let P = mkSave();
 let frame=0;
 
-// run state
-let bird, pipes, score, gOff, lives, runLevel, runLvlPts, comboN, comboT, runBits;
+// run state — initialised to safe defaults so home screen draws before newRun()
+let bird = { y:H/2-30, vy:0, angle:0, t:0 };
+let pipes=[], score=0, gOff=0, lives=3, runLevel=1, runLvlPts=0, comboN=0, comboT=0, runBits=0;
 let dTimer=0, particles=[], lvlFlash=0;
-let fx={};
+let fx={ ghost:0, shield:false, gapBonus:0, slowTimer:0, turboTimer:0, doubleBitsTimer:0 };
 
 // pit stop
 let pitCards=[], pitPicked=false;
@@ -705,7 +706,11 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-document.fonts.ready.then(()=>requestAnimationFrame(loop));
+// Start loop — fonts.ready with 1s timeout fallback for mobile Safari
+let _started=false;
+function _start(){if(!_started){_started=true;requestAnimationFrame(loop);}}
+document.fonts.ready.then(_start);
+setTimeout(_start,1000);
 </script>
 </body>
 </html>

@@ -725,8 +725,12 @@ document.addEventListener('keydown', e => {
   if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); flap(); }
   if (e.code === 'KeyH' && state === 'idle') { state = 'tutorial'; }
 });
-canvas.addEventListener('pointerdown', handlePointer);
+// Use touchstart only (pointerdown fires after touchstart on iOS, causing double-flap)
 canvas.addEventListener('touchstart', handlePointer, { passive: false });
+// Fallback for non-touch devices (desktop mouse)
+canvas.addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'touch') handlePointer(e);
+});
 
 // ── Loop Main ─
 function loop() {

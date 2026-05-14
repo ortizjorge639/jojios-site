@@ -91,6 +91,46 @@ if (window.visualViewport) window.visualViewport.addEventListener('resize', resi
 const GRAV=0.28, BASE_FLAPV=-5.0, PW=52, BASE_PG=118, GH=72, GYL=H-GH, BX=70, PINT=88;
 const STARS = Array.from({length:40}, ()=>({ x:Math.random()*W|0, y:Math.random()*(GYL*0.9)|0, b:Math.random()*8|0 }));
 
+// ── Vaporwave Audio ──────────────────────────────────
+let _ac=null;
+function ac(){if(!_ac)_ac=new(window.AudioContext||window.webkitAudioContext)();return _ac;}
+function playTone(freq,type,vol,dur,detune=0,delay=0){
+  try{
+    const a=ac(),o=a.createOscillator(),g=a.createGain(),rev=a.createGain();
+    o.type=type; o.frequency.value=freq; o.detune.value=detune;
+    g.gain.setValueAtTime(vol,a.currentTime+delay);
+    g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+delay+dur);
+    o.connect(g);g.connect(a.destination);
+    o.start(a.currentTime+delay); o.stop(a.currentTime+delay+dur);
+  }catch(e){}
+}
+function sfxFlap(){
+  playTone(420,'sine',0.09,0.07);
+  playTone(320,'sine',0.05,0.05,0,0.03);
+}
+function sfxScore(){
+  playTone(660,'triangle',0.07,0.05);
+  playTone(880,'triangle',0.05,0.04,0,0.04);
+}
+function sfxPitScore(){ // big milestone — vaporwave chord
+  [220,330,440,554].forEach((f,i)=>playTone(f,'sine',0.1,0.5,0,i*0.04));
+  playTone(880,'sine',0.06,0.7,0,0.1);
+}
+function sfxCountdown(n){ // 3-2-1 ticks
+  playTone(n===0?880:440,'square',0.1,0.12);
+}
+function sfxPitOpen(){ // dreamy chord stab
+  [330,415,554,660].forEach((f,i)=>playTone(f,'sine',0.12,0.9,-10+i*5,i*0.02));
+}
+function sfxPowerUp(){
+  [440,554,660,880].forEach((f,i)=>playTone(f,'triangle',0.09,0.15,0,i*0.06));
+}
+function sfxDie(){
+  playTone(220,'sawtooth',0.12,0.15);
+  playTone(160,'sawtooth',0.1,0.2,0,0.12);
+  playTone(110,'sawtooth',0.08,0.3,0,0.25);
+}
+
 // ── State ────────────────────────────────────────────
 let state = 'home';
 let P = mkSave();
@@ -104,8 +144,10 @@ let fx={ ghost:0, shield:false, gapBonus:0, slowTimer:0, turboTimer:0, doubleBit
 
 // pit stop
 let pitCards=[], pitPicked=false, pitTransTimer=0, lastPitScore=-1;
+let pitCountTimer=0; // countdown before entering pitstop
 const PIT_INTERVAL=25;
-const PIT_TRANS_FRAMES=22; // slide-in duration
+const PIT_TRANS_FRAMES=22;
+const PIT_COUNT_FRAMES=90; // ~1.5s countdown (3-2-1 GO)
 
 // gameover
 let goXpBefore=0, goXpGain=0, goNewLevel=false, goNewSkins=[], goRunBits=0, goCanInput=false, goTimer=0;
@@ -124,7 +166,7 @@ function newRun() {
   runLevel=1; runLvlPts=0; comboN=0; comboT=0; runBits=0;
   particles=[]; lvlFlash=0;
   fx = { ghost:0, shield:0, gapBonus:0, slowTimer:0, turboTimer:0, doubleBitsTimer:0 };
-  pitCards=[]; pitPicked=false; pitTransTimer=0; lastPitScore=-1;
+  pitCards=[]; pitPicked=false; pitTransTimer=0; lastPitScore=-1; pitCountTimer=0;
 }
 
 function respawn() {
@@ -231,15 +273,20 @@ function drawGround(off) {
   ctx.fillText(txt,ox2,GYL+24);
 }
 
+// ── Pipe theme by score ──────────────────────────────
+function pipeTheme(sc) {
+  if(sc>=75) return { main:'#2a005c',light:'#7a00cc',hi:'#cc44ff',dark:'#150030', name:'cosmic' }; // purple cosmic
+  if(sc>=50) return { main:'#5c1000',light:'#cc2200',hi:'#ff6040',dark:'#2a0500', name:'lava'   }; // red lava
+  if(sc>=25) return { main:'#005c4a',light:'#00aaaa',hi:'#44ffee',dark:'#002a20', name:'cyber'  }; // teal cyber
+  return              { main:'#1a5c1a',light:'#2d8a2d',hi:'#4aaa4a',dark:'#0f3a0f', name:'forest'}; // default green
+}
+
 // ── Draw pipe ────────────────────────────────────────
 function drawPipe(x,tH,bY,warn) {
   const EX=6,CAP=18;
-  const main  = warn?'#5c4a00':'#1a5c1a';
-  const light = warn?'#c8a000':'#2d8a2d';
-  const hi    = warn?'#ffd700':'#4aaa4a';
-  const dark  = warn?'#2a1a00':'#0f3a0f';
+  const theme = warn ? { main:'#5c4a00',light:'#c8a000',hi:'#ffd700',dark:'#2a1a00' } : pipeTheme(score);
+  const {main,light,hi,dark}=theme;
   if(warn) {
-    // pulsing glow for the warning pipe
     const glow=0.3+0.2*Math.sin(frame*0.25);
     ctx.shadowColor='#ffd700'; ctx.shadowBlur=12*glow;
   }
@@ -259,7 +306,6 @@ function drawPipe(x,tH,bY,warn) {
   ctx.fillStyle=hi;    ctx.fillRect(x+3,bY+CAP,2,GYL-bY-CAP);
   if(warn) {
     ctx.shadowBlur=0;
-    // 🏁 flag icon above gap
     ctx.font='14px serif'; ctx.textAlign='center';
     ctx.fillText('🏁', x+PW/2, tH+8);
   }
@@ -337,14 +383,14 @@ function pickCards() {
 
 // ── Apply card ───────────────────────────────────────
 function applyCard(card) {
-  if(card.id==='ghost')      fx.ghost=2;                      // phase 2 pipes
-  if(card.id==='shield')     fx.shield=3;                     // block up to 3 hits
-  if(card.id==='widegap')    fx.gapBonus+=BASE_PG*0.4;        // +40% gap
-  if(card.id==='slowtime')   fx.slowTimer=720;                // 12 pipes worth
-  if(card.id==='turboflap')  fx.turboTimer=600;               // 10 pipes worth
-  if(card.id==='doublebits') fx.doubleBitsTimer=900;          // 15 pipes worth
+  if(card.id==='ghost')      fx.ghost=2;
+  if(card.id==='shield')     fx.shield=3;
+  if(card.id==='widegap')    fx.gapBonus+=BASE_PG*0.4;
+  if(card.id==='slowtime')   fx.slowTimer=720;
+  if(card.id==='turboflap')  fx.turboTimer=600;
+  if(card.id==='doublebits') fx.doubleBitsTimer=900;
   if(card.id==='extralife')  lives=Math.min(lives+1,6);
-  // spawn pick particles
+  sfxPowerUp();
   for(let i=0;i<18;i++) cardBurst(BX,bird.y,card.col);
 }
 
@@ -555,25 +601,36 @@ function tickPlaying() {
       p.scored=true; score++; runLvlPts++;
       const b=fx.doubleBitsTimer>0?2:1; runBits+=b;
       comboN++;comboT=55;
-      if((P.bits+runBits)>P.bits||true) {} // track live
       if(score>P.highScore) P.highScore=score;
       if(runLvlPts>=10) { runLevel++;runLvlPts=0;lvlFlash=80; }
+      sfxScore();
+      // confetti on pit stop milestone
+      if(score%PIT_INTERVAL===0) {
+        const cols=['#ffd700','#ff80ff','#44ffee','#ff6040','#ffffff'];
+        for(let i=0;i<30;i++){
+          const a=Math.random()*Math.PI*2,spd2=2+Math.random()*5;
+          particles.push({x:BX,y:bird.y,vx:Math.cos(a)*spd2,vy:Math.sin(a)*spd2-3,life:1,col:cols[i%5]});
+        }
+        sfxPitScore();
+      }
     }
   }
   pipes=pipes.filter(p=>p.x>-PW-10);
   comboT=Math.max(0,comboT-1);
   if(comboN>P.bestCombo) P.bestCombo=comboN;
 
-  // pit stop trigger — every 25 pipes, fire once per milestone
-  if(score>0 && score%PIT_INTERVAL===0 && score!==lastPitScore) {
+  // pit stop countdown: freeze world and count down before card screen
+  if(score>0 && score%PIT_INTERVAL===0 && score!==lastPitScore && pitCountTimer===0) {
     lastPitScore=score;
-    pitCards=pickCards(); pitTransTimer=PIT_TRANS_FRAMES; state='pitstop'; pitPicked=false; return;
+    pitCountTimer=PIT_COUNT_FRAMES;
+    state='pitcountdown';
+    return;
   }
 
   if(hits()) {
     if(fx.ghost>0) { fx.ghost--; return; }
     if(fx.shield>0) { fx.shield--; return; }
-    burst(BX,bird.y); lives--;
+    burst(BX,bird.y); sfxDie(); lives--;
     if(lives>0) { dTimer=80; state='dying'; }
     else { startGameOver(); }
   }
@@ -602,6 +659,55 @@ function drawPlaying() {
   if(fx.slowTimer>0)  { pt('T',8+fxi*14,H-GH-8,6,'#ff80ff'); fxi++; }
   if(fx.turboTimer>0) { pt('F',8+fxi*14,H-GH-8,6,'#ff8040'); fxi++; }
   if(fx.doubleBitsTimer>0) { pt('$',8+fxi*14,H-GH-8,6,'#ffd700'); fxi++; }
+  drawCRT();
+}
+
+// ── PIT COUNTDOWN ──────────────────────────────────
+function tickPitCountdown() {
+  pitCountTimer--;
+  // bird still hovers — gentle bob, no gravity
+  bird.y = H/2-30 + Math.sin(frame*0.05)*6;
+  bird.angle=0;
+  bird.t++;
+  gOff+=0.3;
+
+  const n = Math.ceil(pitCountTimer / (PIT_COUNT_FRAMES/3)); // 3→1
+  const prev = Math.ceil((pitCountTimer+1) / (PIT_COUNT_FRAMES/3));
+  if(n !== prev) sfxCountdown(n); // tick on each number change
+
+  if(pitCountTimer<=0) {
+    // respawn bird to center, clear oncoming pipes, enter pitstop
+    bird = { y:H/2-30, vy:0, angle:0, t:0 };
+    pipes = pipes.filter(p=>p.scored); // keep only scored pipes (off-screen)
+    pitCards=pickCards(); pitTransTimer=PIT_TRANS_FRAMES;
+    state='pitstop'; pitPicked=false;
+    sfxPitOpen();
+  }
+}
+
+function drawPitCountdown() {
+  drawSky();
+  for(const p of pipes) drawPipe(p.x,p.topH,p.topH+BASE_PG+(P.upgrades.wideGap*BASE_PG*0.15),p.pitWarn);
+  drawGround(gOff);
+  tickParticles();
+  drawBird(BX,bird.y|0,0,bird.t,false,P.equippedSkin);
+  const maxL=3+P.upgrades.extraLife;
+  drawHUD(score,runLevel,lives,runBits,maxL);
+
+  // countdown number
+  const n = Math.ceil(pitCountTimer / (PIT_COUNT_FRAMES/3));
+  const prog = 1 - (pitCountTimer % (PIT_COUNT_FRAMES/3)) / (PIT_COUNT_FRAMES/3);
+  const sz = 8+Math.floor((1-prog)*8); // scales up as it appears
+  ctx.globalAlpha = Math.min(1, (1-prog)*2);
+  const label = n>0 ? ''+n : 'GO!';
+  const col = n>0 ? '#ffd700' : '#00ff88';
+  pts(label, W/2, H/2-20, sz+10, col);
+  ctx.globalAlpha=1;
+
+  // "PIT STOP" banner fades in
+  ctx.globalAlpha=Math.min(1,(1-pitCountTimer/PIT_COUNT_FRAMES)*2);
+  pt('PIT STOP INCOMING',W/2,H/2+20,5,'#ffd700aa');
+  ctx.globalAlpha=1;
   drawCRT();
 }
 
@@ -691,7 +797,11 @@ function drawPitStop() {
     }
   }
   if(!picked&&hitBtn('pitskip')) picked=true;
-  if(picked) { state='playing'; pitPicked=true; }
+  if(picked) {
+    // give bird a gentle nudge upward and let them tap to fly
+    bird = { y:H/2-30, vy:-1.5, angle:0, t:0 };
+    state='playing'; pitPicked=true;
+  }
   tapPos=null;
 }
 
@@ -849,7 +959,7 @@ function onTap(lx,ly) {
   if(now-lastTap<100) return;
   lastTap=now;
   tapPos={x:lx,y:ly};
-  if(state==='playing') { bird.vy=BASE_FLAPV*(1+(P.upgrades.flapBoost*0.15))*(fx.turboTimer>0?1.3:1); }
+  if(state==='playing') { bird.vy=BASE_FLAPV*(1+(P.upgrades.flapBoost*0.15))*(fx.turboTimer>0?1.3:1); sfxFlap(); }
   if(state==='dying')   {}
 }
 canvas.addEventListener('touchstart',e=>{
@@ -870,9 +980,10 @@ document.addEventListener('keydown',e=>{
 // ── MAIN LOOP ────────────────────────────────────────
 function loop() {
   frame++;
-  if(state==='playing')  { tickPlaying(); drawPlaying(); }
-  else if(state==='pitstop') { drawPitStop(); }
-  else if(state==='dying')   { tickDying();  drawDying();  }
+  if(state==='playing')       { tickPlaying(); drawPlaying(); }
+  else if(state==='pitcountdown') { tickPitCountdown(); drawPitCountdown(); }
+  else if(state==='pitstop')  { drawPitStop(); }
+  else if(state==='dying')    { tickDying();  drawDying();  }
   else if(state==='gameover'){
     goTimer++;
     dTimer=Math.max(0,dTimer-1);

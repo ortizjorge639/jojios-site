@@ -468,6 +468,9 @@ function drawHome() {
   drawBtn('skin','SKIN: '+(sk.name.slice(0,6)),W/2-60,skinY,120,22,'#8888ff',true);
   if(nextSkin) pt('LV'+nextSkin.unlockLv+' → '+nextSkin.name.slice(0,8),W/2,skinY+36,5,'#554');
 
+  // how to play button
+  drawBtn('howto','? HOW TO PLAY',W/2-66,H/2+148,132,18,'#444',true);
+
   drawCRT();
 
   if(tapPos) {
@@ -479,6 +482,8 @@ function drawHome() {
       const cur=unlocked.indexOf(P.equippedSkin);
       P.equippedSkin=unlocked[(cur+1)%unlocked.length];
       persist(P);
+    } else if(hitBtn('howto')) {
+      startTutorial();
     }
     tapPos=null;
   }

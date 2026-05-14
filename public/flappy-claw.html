@@ -50,13 +50,13 @@ const SKIN_ORDER = ['default','ice','lava','neon','gold','dark'];
 
 // ── pool Card ───────
 const CARDS = [
-  { id:'ghost',      name:'GHOST WING',  desc:'Pass thru next pipe',  col:'#a0a0ff', icon:'G' },
-  { id:'shield',     name:'SHIELD',      desc:'Absorb 1 collision',   col:'#4080ff', icon:'S' },
-  { id:'widegap',    name:'WIDE GAP',    desc:'+30% gap  5 pipes',     col:'#80ff40', icon:'W' },
-  { id:'doublebits', name:'DOUBLE BITS', desc:'2x BITS  12 pipes',     col:'#ffd700', icon:'$' },
-  { id:'slowtime',   name:'SLOW TIME',   desc:'-40% speed  10 pipes',  col:'#ff80ff', icon:'T' },
-  { id:'extralife',  name:'EXTRA LIFE',  desc:'+1 life instantly',     col:'#ff4444', icon:'+' },
-  { id:'turboflap',  name:'TURBO FLAP',  desc:'+30% flap  8 pipes',   col:'#ff8040', icon:'F' },
+  { id:'ghost',      name:'GHOST WING',  desc:'Phase thru/2 pipes',   col:'#a0a0ff', icon:'👻' },
+  { id:'shield',     name:'SHIELD',      desc:'Block next/3 hits',     col:'#4080ff', icon:'🛡' },
+  { id:'widegap',    name:'WIDE GAP',    desc:'+40% gap/8 pipes',      col:'#80ff40', icon:'↕' },
+  { id:'doublebits', name:'DOUBLE BITS', desc:'2× BITS/15 pipes',      col:'#ffd700', icon:'💰' },
+  { id:'slowtime',   name:'SLOW TIME',   desc:'-45% speed/12 pipes',   col:'#ff80ff', icon:'⏳' },
+  { id:'extralife',  name:'EXTRA LIFE',  desc:'+1 life instantly',      col:'#ff4444', icon:'❤️' },
+  { id:'turboflap',  name:'TURBO FLAP', desc:'Flap 35% higher/10p',   col:'#ff8040', icon:'⚡' },
 ];
 
 // ── items Shop ──────────────
@@ -103,7 +103,8 @@ let dTimer=0, particles=[], lvlFlash=0;
 let fx={ ghost:0, shield:false, gapBonus:0, slowTimer:0, turboTimer:0, doubleBitsTimer:0 };
 
 // pit stop
-let pitCards=[], pitPicked=false;
+let pitCards=[], pitPicked=false, pitTransTimer=0;
+const PIT_TRANS_FRAMES=22; // slide-in duration
 
 // gameover
 let goXpBefore=0, goXpGain=0, goNewLevel=false, goNewSkins=[], goRunBits=0, goCanInput=false, goTimer=0;
@@ -121,8 +122,8 @@ function newRun() {
   lives = 3 + P.upgrades.extraLife;
   runLevel=1; runLvlPts=0; comboN=0; comboT=0; runBits=0;
   particles=[]; lvlFlash=0;
-  fx = { ghost:0, shield:false, gapBonus:0, slowTimer:0, turboTimer:0, doubleBitsTimer:0 };
-  pitCards=[]; pitPicked=false;
+  fx = { ghost:0, shield:0, gapBonus:0, slowTimer:0, turboTimer:0, doubleBitsTimer:0 };
+  pitCards=[]; pitPicked=false; pitTransTimer=0;
 }
 
 function respawn() {
@@ -265,6 +266,12 @@ function burst(x,y) {
     particles.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd-1,life:1,col:cols[i%5]});
   }
 }
+function cardBurst(x,y,col) {
+  for(let i=0;i<18;i++) {
+    const a=Math.random()*Math.PI*2,spd=1.5+Math.random()*4;
+    particles.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd-2,life:1,col});
+  }
+}
 function tickParticles() {
   particles=particles.filter(p=>p.life>0);
   for(const p of particles) {
@@ -300,13 +307,15 @@ function pickCards() {
 
 // ── Apply card ───────────────────────────────────────
 function applyCard(card) {
-  if(card.id==='ghost')      fx.ghost=1;
-  if(card.id==='shield')     fx.shield=true;
-  if(card.id==='widegap')    fx.gapBonus+=BASE_PG*0.3;
-  if(card.id==='slowtime')   fx.slowTimer=600;
-  if(card.id==='turboflap')  fx.turboTimer=480;
-  if(card.id==='doublebits') fx.doubleBitsTimer=720;
+  if(card.id==='ghost')      fx.ghost=2;                      // phase 2 pipes
+  if(card.id==='shield')     fx.shield=3;                     // block up to 3 hits
+  if(card.id==='widegap')    fx.gapBonus+=BASE_PG*0.4;        // +40% gap
+  if(card.id==='slowtime')   fx.slowTimer=720;                // 12 pipes worth
+  if(card.id==='turboflap')  fx.turboTimer=600;               // 10 pipes worth
+  if(card.id==='doublebits') fx.doubleBitsTimer=900;          // 15 pipes worth
   if(card.id==='extralife')  lives=Math.min(lives+1,6);
+  // spawn pick particles
+  for(let i=0;i<18;i++) cardBurst(BX,bird.y,card.col);
 }
 
 // ── CRT scanlines ────────────────────────────────────
@@ -360,7 +369,7 @@ const TUTORIAL_SLIDES = [
   },
   {
     title: 'PIT STOPS',
-    lines: ['Every 10 pipes,','choose a power-up','card to help you','survive longer!'],
+    lines: ['Every 25 pipes,','choose a power-up','card to help you','survive longer!'],
     icon: '🛑',
     color: '#ffd700',
   },
@@ -522,18 +531,18 @@ function tickPlaying() {
   comboT=Math.max(0,comboT-1);
   if(comboN>P.bestCombo) P.bestCombo=comboN;
 
-  // pit stop trigger
-  if(score>0&&score%10===0&&score!==0&&!pipes.some(p=>p.scored&&p.x<BX)) {
+  // pit stop trigger — every 25 pipes
+  if(score>0&&score%25===0&&score!==0&&!pipes.some(p=>p.scored&&p.x<BX)) {
     // only trigger once per milestone
     const lastPipe=pipes[pipes.length-1];
     if(lastPipe&&lastPipe.scored) {
-      pitCards=pickCards(); state='pitstop'; pitPicked=false; return;
+      pitCards=pickCards(); pitTransTimer=PIT_TRANS_FRAMES; state='pitstop'; pitPicked=false; return;
     }
   }
 
   if(hits()) {
     if(fx.ghost>0) { fx.ghost--; return; }
-    if(fx.shield) { fx.shield=false; return; }
+    if(fx.shield>0) { fx.shield--; return; }
     burst(BX,bird.y); lives--;
     if(lives>0) { dTimer=80; state='dying'; }
     else { startGameOver(); }
@@ -550,7 +559,7 @@ function drawPlaying() {
   drawHUD(score,runLevel,lives,runBits,maxL);
   // fx icons
   let fxi=0;
-  if(fx.shield)    { pt('S',8+fxi*14,H-GH-8,6,'#4080ff'); fxi++; }
+  if(fx.shield>0)  { pt('S×'+fx.shield,8+fxi*14,H-GH-8,6,'#4080ff'); fxi++; }
   if(fx.ghost>0)   { pt('G',8+fxi*14,H-GH-8,6,'#a0a0ff'); fxi++; }
   if(fx.slowTimer>0)  { pt('T',8+fxi*14,H-GH-8,6,'#ff80ff'); fxi++; }
   if(fx.turboTimer>0) { pt('F',8+fxi*14,H-GH-8,6,'#ff8040'); fxi++; }
@@ -558,50 +567,94 @@ function drawPlaying() {
   drawCRT();
 }
 
-// ── STOP PIT ──────────────────
+// ── PIT STOP (animated) ────────────────────────────────
 function drawPitStop() {
+  // advance transition timer
+  if(pitTransTimer>0) pitTransTimer--;
+  const prog=1-(pitTransTimer/PIT_TRANS_FRAMES); // 0→1 as it opens
+
+  // background (still world frozen behind)
   drawSky();
   for(const p of pipes) drawPipe(p.x,p.topH,p.topH+BASE_PG+(P.upgrades.wideGap*BASE_PG*0.15));
   drawGround(gOff);
   drawBird(BX,bird.y|0,0,bird.t,false,P.equippedSkin);
+  tickParticles();
 
-  ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.fillRect(0,0,W,H);
+  // dark vignette fades in
+  const alpha=Math.min(0.82, prog*0.82);
+  ctx.fillStyle=`rgba(0,0,0,${alpha})`; ctx.fillRect(0,0,W,H);
 
-  pts('PIT STOP',W/2,52,10,'#ffd700');
-  pt('SCORE: '+score,W/2,70,6,'#aaa');
+  // slide-in offset (cards slide up from bottom)
+  const slideOff=(1-prog)*H*0.55;
+  ctx.save();
+  ctx.translate(0, slideOff);
 
-  const cw=76,ch=90,gap=8,startX=(W-(cw*3+gap*2))/2;
-  const cardY=86;
+  // header flashes on
+  if(prog>0.4) {
+    const flashA=Math.min(1,(prog-0.4)/0.3);
+    ctx.globalAlpha=flashA;
+    // glowing title bg strip
+    ctx.fillStyle='rgba(255,215,0,0.12)'; ctx.fillRect(0,36,W,32);
+    pts('🏁 PIT STOP',W/2,54,10,'#ffd700');
+    pt('SCORE: '+score,W/2,70,6,'#aaa');
+    ctx.globalAlpha=1;
+  }
+
+  // cards
+  const cw=78,ch=98,gap=7,startX=(W-(cw*3+gap*2))/2;
+  const cardY=84;
   const CARD_RECTS=[];
   for(let i=0;i<pitCards.length;i++) {
     const c=pitCards[i];
     const cx2=startX+i*(cw+gap);
+    // stagger each card slightly
+    const cardAlpha=prog>0.25?Math.min(1,(prog-0.25-i*0.08)/0.25):0;
+    ctx.globalAlpha=cardAlpha;
     CARD_RECTS.push({x:cx2,y:cardY,w:cw,h:ch,card:c});
-    drawPanel(cx2,cardY,cw,ch,'#0a0a18',c.col);
-    // icon circle
-    ctx.fillStyle=c.col+'44'; ctx.fillRect(cx2+cw/2-12,cardY+8,24,24);
-    pt(c.icon,cx2+cw/2,cardY+26,10,c.col);
-    // name (split on space)
+
+    // glow ring
+    ctx.shadowColor=c.col; ctx.shadowBlur=10;
+    drawPanel(cx2,cardY,cw,ch,'#0a0a1c',c.col);
+    ctx.shadowBlur=0;
+
+    // icon (emoji)
+    ctx.font='20px serif'; ctx.textAlign='center';
+    ctx.fillText(c.icon, cx2+cw/2, cardY+28);
+
+    // name lines
     const words=c.name.split(' ');
-    words.forEach((w,wi)=>pt(w,cx2+cw/2,cardY+42+wi*11,5,c.col));
-    // desc
+    words.forEach((w,wi)=>pt(w,cx2+cw/2,cardY+42+wi*12,5,c.col));
+
+    // desc (split on /)
     const dlines=c.desc.split('/');
-    dlines.forEach((dl,di)=>pt(dl.trim(),cx2+cw/2,cardY+70+di*9,4,'#888'));
+    dlines.forEach((dl,di)=>pt(dl.trim(),cx2+cw/2,cardY+72+di*10,4,'#888'));
+
+    ctx.globalAlpha=1;
+    ctx.shadowBlur=0;
   }
-  drawBtn('pitskip','SKIP',W/2-30,200,60,20,'#444',true);
+
+  // skip button
+  ctx.globalAlpha=prog>0.7?Math.min(1,(prog-0.7)/0.2):0;
+  drawBtn('pitskip','SKIP',W/2-32,cardY+ch+10,64,20,'#555',true);
+  ctx.globalAlpha=1;
+
+  ctx.restore();
   drawCRT();
 
-  if(tapPos) {
-    let picked=false;
-    for(const r of CARD_RECTS) {
-      if(tapPos.x>=r.x&&tapPos.x<=r.x+r.w&&tapPos.y>=r.y&&tapPos.y<=r.y+r.h) {
-        applyCard(r.card); picked=true; break;
-      }
+  // input only when fully transitioned in
+  if(pitTransTimer>0||!tapPos) { tapPos=null; return; }
+
+  let picked=false;
+  for(const r of CARD_RECTS) {
+    // adjust for slide (slideOff is 0 when fully open)
+    if(tapPos.x>=r.x&&tapPos.x<=r.x+r.w&&tapPos.y>=r.y&&tapPos.y<=r.y+r.h) {
+      cardBurst(r.x+r.w/2, r.y+r.h/2, r.card.col);
+      applyCard(r.card); picked=true; break;
     }
-    if(!picked&&hitBtn('pitskip')) picked=true;
-    if(picked) { state='playing'; pitPicked=true; }
-    tapPos=null;
   }
+  if(!picked&&hitBtn('pitskip')) picked=true;
+  if(picked) { state='playing'; pitPicked=true; }
+  tapPos=null;
 }
 
 // ── DYING ────────────────────────────────────────────

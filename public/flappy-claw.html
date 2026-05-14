@@ -8,476 +8,704 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; background: #000; overflow: hidden; touch-action: none; }
-    body { display: flex; justify-content: center; align-items: center; min-height: 100dvh; min-height: -webkit-fill-available; }
+    body { display: flex; justify-content: center; align-items: center;
+           min-height: 100dvh; min-height: -webkit-fill-available; }
     canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; cursor: pointer; }
   </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <script>
-// ═══════════════════════════════════════════════════
-//  AGENT_CONFIG — edit this block to fork the game
-// ═══════════════════════════════════════════════════
-const CFG = {
-  title:       'FLAPPY\nCLAW',
-  lore:        ['AGENT: CLAW', 'LEVEL: 96', 'NODE: AZURE'],
-  groundText:  'HEARTBEAT OK   LEVEL 96   DEPLOY   ',
-  lives:       3,
-  colors: {
-    accent:  '#00ff88',
-    player:  '#e84040',
-    player2: '#cc2020',
-    eye:     '#ffffff',
-  },
-  // drawPlayer: ctx pre-translated to bird center, pre-rotated
-  drawPlayer(ctx, t, dead) {
-    const P = 3;
-    const c1 = dead ? '#884040' : '#e84040';
-    const c2 = dead ? '#661818' : '#cc2020';
-    // pixel grid: 0=skip 1=body 2=eye 3=dark
-    const G = [
-      [0,0,1,1,1,0,0],
-      [0,1,1,2,1,1,0],
-      [1,3,1,1,1,3,1],
-      [1,1,1,1,1,1,1],
-      [0,1,1,1,1,1,0],
-      [0,0,1,0,1,0,0],
-    ];
-    const ox = -(G[0].length * P) / 2;
-    const oy = -(G.length * P) / 2;
-    for (let r = 0; r < G.length; r++) {
-      for (let c = 0; c < G[r].length; c++) {
-        const v = G[r][c];
-        if (!v) continue;
-        ctx.fillStyle = v === 2 ? '#fff' : v === 3 ? c2 : c1;
-        ctx.fillRect(ox + c*P, oy + r*P, P, P);
-      }
-    }
-    // claws
-    if (!dead) {
-      ctx.fillStyle = c2;
-      ctx.fillRect(ox + 7*P, oy + P,   P*2, P*2);
-      ctx.fillRect(ox - P*2, oy + 3*P, P*2, P*2);
-    }
-    // antennae
-    const fl = Math.floor(t/8) % 2;
-    ctx.fillStyle = c2;
-    ctx.fillRect(ox + 2*P, oy - (fl?2:1)*P, P, P*2);
-    ctx.fillRect(ox + 4*P, oy - (fl?1:2)*P, P, P*2);
-  },
-};
+// ── Persistent save ─────────────────────────────────
+const SAVE_KEY = 'flappyClaw_v2';
+function loadSave() {
+  try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch(e) { return {}; }
+}
+function mkSave() {
+  const s = loadSave();
+  return {
+    bits:          s.bits          ?? 0,
+    level:         s.level         ?? 1,
+    xp:            s.xp            ?? 0,
+    highScore:     s.highScore     ?? 0,
+    equippedSkin:  s.equippedSkin  ?? 'default',
+    unlockedSkins: s.unlockedSkins ?? ['default'],
+    upgrades:      s.upgrades      ?? { extraLife:0, wideGap:0, flapBoost:0, xpBoost:0 },
+    totalRuns:     s.totalRuns     ?? 0,
+    bestCombo:     s.bestCombo     ?? 0,
+  };
+}
+function persist(P) { localStorage.setItem(SAVE_KEY, JSON.stringify(P)); }
 
-// ═══════════════════════════════════════════════════
-//  ENGINE
-// ═════════════════
+Skins // ── ──────────────────────────────────────────
+const SKINS = {
+  default: { name:'CLAW',       c1:'#e84040', c2:'#cc2020', glow:null },
+  ice:     { name:'ICE CLAW',   c1:'#40a8e8', c2:'#2080c0', glow:'#80d0ff', unlockLv:5  },
+  lava:    { name:'LAVA CLAW',  c1:'#ff8020', c2:'#cc5000', glow:'#ff6000', unlockLv:10 },
+  neon:    { name:'NEON CLAW',  c1:'#40ff80', c2:'#00cc50', glow:'#00ff88', unlockLv:15 },
+  gold:    { name:'GOLD CLAW',  c1:'#ffd700', c2:'#cc9900', glow:'#ffdd44', unlockLv:25 },
+  dark:    { name:'DARK CLAW',  c1:'#8040ff', c2:'#5020cc', glow:'#8000ff', unlockLv:50 },
+};
+const SKIN_ORDER = ['default','ice','lava','neon','gold','dark'];
+
+// ── pool Card ───────
+const CARDS = [
+  { id:'ghost',      name:'GHOST WING',  desc:'Pass thru next pipe',  col:'#a0a0ff', icon:'G' },
+  { id:'shield',     name:'SHIELD',      desc:'Absorb 1 collision',   col:'#4080ff', icon:'S' },
+  { id:'widegap',    name:'WIDE GAP',    desc:'+30% gap  5 pipes',     col:'#80ff40', icon:'W' },
+  { id:'doublebits', name:'DOUBLE BITS', desc:'2x BITS  12 pipes',     col:'#ffd700', icon:'$' },
+  { id:'slowtime',   name:'SLOW TIME',   desc:'-40% speed  10 pipes',  col:'#ff80ff', icon:'T' },
+  { id:'extralife',  name:'EXTRA LIFE',  desc:'+1 life instantly',     col:'#ff4444', icon:'+' },
+  { id:'turboflap',  name:'TURBO FLAP',  desc:'+30% flap  8 pipes',   col:'#ff8040', icon:'F' },
+];
+
+// ── items Shop ──────────────
+const SHOP_ITEMS = [
+  { id:'extraLife',  name:'EXTRA LIFE', desc:'Start +1 life',      cost:50, max:2 },
+  { id:'wideGap',    name:'WIDE GAP',   desc:'Default gap +15%',   cost:40, max:3 },
+  { id:'flapBoost',  name:'FLAP BOOST', desc:'Jump 15% higher',    cost:30, max:3 },
+  { id:'xpBoost',    name:'XP BOOST',   desc:'25% more XP/run',    cost:60, max:2 },
+];
+
+// ── Canvas setup ─────────────────────────────────────
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
-
 const W = 288, H = 512;
 let scale = 1;
-
 function resize() {
   const vp = window.visualViewport;
   const vw = vp ? vp.width  : window.innerWidth;
   const vh = vp ? vp.height : window.innerHeight;
-  scale = Math.min(vw / W, vh / H);
-  canvas.width  = Math.floor(W * scale);
-  canvas.height = Math.floor(H * scale);
-  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  scale = Math.min(vw/W, vh/H);
+  canvas.width  = Math.floor(W*scale);
+  canvas.height = Math.floor(H*scale);
+  ctx.setTransform(scale,0,0,scale,0,0);
   ctx.imageSmoothingEnabled = false;
 }
 resize();
 window.addEventListener('resize', resize);
 if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
 
-// Constants
-const GRAV  = 0.28;
-const FLAPV = -5.0;
-const PW    = 52;
-const PG    = 118;
-const GH    = 72;
-const GYL   = H - GH;
-const BX    = 70;
-const PINT  = 88;
+// ── Constants ────────────────────────────────────────
+const GRAV=0.28, BASE_FLAPV=-5.0, PW=52, BASE_PG=118, GH=72, GYL=H-GH, BX=70, PINT=88;
+const STARS = Array.from({length:40}, ()=>({ x:Math.random()*W|0, y:Math.random()*(GYL*0.9)|0, b:Math.random()*8|0 }));
 
-// State machine: 'title' | 'playing' | 'dying' | 'gameover'
-let state = 'title';
-let bird, pipes, score, frame, gOff, lives, level, lvlPts, comboN, comboT, dTimer;
-let hiScore = 0;
-let particles = [];
-let lvlFlash = 0;
+State // ── ────────────────────────────────────────
+let state = 'home';
+let P = mkSave();
+let frame=0;
 
-function newGame() {
-  bird   = { y: H/2 - 30, vy: 0, angle: 0, t: 0 };
-  pipes  = [];
-  score  = 0; frame = 0; gOff = 0;
-  lives  = CFG.lives;
-  level  = 1; lvlPts = 0;
-  comboN = 0; comboT = 0;
-  particles = [];
-  lvlFlash = 0;
+// run state
+let bird, pipes, score, gOff, lives, runLevel, runLvlPts, comboN, comboT, runBits;
+let dTimer=0, particles=[], lvlFlash=0;
+let fx={};
+
+// pit stop
+let pitCards=[], pitPicked=false;
+
+// gameover
+let goXpBefore=0, goXpGain=0, goNewLevel=false, goNewSkins=[], goRunBits=0, goCanInput=false, goTimer=0;
+
+// shop / home tap pos
+let tapPos=null;
+
+// XP formula
+function xpToNext(lv) { return lv*100+50; }
+
+function newRun() {
+  P = mkSave();
+  bird = { y:H/2-30, vy:0, angle:0, t:0 };
+  pipes=[]; score=0; frame=0; gOff=0;
+  lives = 3 + P.upgrades.extraLife;
+  runLevel=1; runLvlPts=0; comboN=0; comboT=0; runBits=0;
+  particles=[]; lvlFlash=0;
+  fx = { ghost:0, shield:false, gapBonus:0, slowTimer:0, turboTimer:0, doubleBitsTimer:0 };
+  pitCards=[]; pitPicked=false;
 }
-newGame();
 
 function respawn() {
-  bird = { y: H/2 - 30, vy: 0, angle: 0, t: 0 };
-  pipes = pipes.filter(p => p.x > BX + 120);
-  comboN = 0;
+  bird = { y:H/2-30, vy:0, angle:0, t:0 };
+  pipes = pipes.filter(p=>p.x>BX+120);
+  comboN=0;
 }
 
-// ── Stars ──────────────────────────────────────────
-const STARS = Array.from({length: 40}, () => ({
-  x: Math.random() * W | 0,
-  y: Math.random() * GYL * 0.85 | 0,
-  b: Math.random() * 8 | 0,
-}));
-
-// ── Font helper ────────────────────────────────────
-function pt(txt, x, y, sz, col, align) {
-  ctx.font = sz + 'px "Press Start 2P",monospace';
-  ctx.textAlign = align || 'center';
+// ── Text helpers ─────────────────────────────────────
+function pt(txt,x,y,sz,col,align) {
+  ctx.font = sz+'px "Press Start 2P",monospace';
+  ctx.textAlign = align||'center';
   ctx.fillStyle = col;
-  ctx.fillText(txt, x, y);
+  ctx.fillText(txt,x,y);
 }
-function pts(txt, x, y, sz, col, sh) {
-  ctx.font = sz + 'px "Press Start 2P",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillStyle = sh || '#000';
-  ctx.fillText(txt, x+2, y+2);
-  ctx.fillStyle = col;
-  ctx.fillText(txt, x, y);
+function pts(txt,x,y,sz,col,sh) {
+  ctx.font = sz+'px "Press Start 2P",monospace';
+  ctx.textAlign='center';
+  ctx.fillStyle = sh||'#000';
+  ctx.fillText(txt,x+2,y+2);
+  ctx.fillStyle=col;
+  ctx.fillText(txt,x,y);
 }
 
-// ── Sky Draw: ───────────────────────────────
+// ── Draw bird ────────────────────────────────────────
+function drawBird(cx,cy,ang,t,dead,skinId) {
+  const sk = SKINS[skinId]||SKINS.default;
+  const P2=3;
+  const c1=dead ? '#884040' : sk.c1;
+  const c2=dead ? '#661818' : sk.c2;
+  const G=[
+    [0,0,1,1,1,0,0],
+    [0,1,1,2,1,1,0],
+    [3,1,1,1,1,1,3],
+    [1,1,1,1,1,1,1],
+    [0,1,1,1,1,1,0],
+    [0,0,1,0,1,0,0],
+  ];
+  const ox=-(G[0].length*P2)/2, oy=-(G.length*P2)/2;
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.rotate(ang);
+  if (sk.glow && !dead) {
+    ctx.shadowColor=sk.glow; ctx.shadowBlur=8;
+  }
+  for (let r=0;r<G.length;r++) for (let c=0;c<G[r].length;c++) {
+    const v=G[r][c]; if(!v) continue;
+    ctx.fillStyle = v===2?'#fff':v===3?c2:c1;
+    ctx.fillRect(ox+c*P2,oy+r*P2,P2,P2);
+  }
+  ctx.shadowBlur=0;
+  if (!dead) {
+    ctx.fillStyle=c2;
+    ctx.fillRect(ox+7*P2,oy+P2,P2*2,P2*2);
+    ctx.fillRect(ox-P2*2,oy+3*P2,P2*2,P2*2);
+  }
+  const fl=Math.floor(t/8)%2;
+  ctx.fillStyle=c2;
+  ctx.fillRect(ox+2*P2,oy-(fl?2:1)*P2,P2,P2*2);
+  ctx.fillRect(ox+4*P2,oy-(fl?1:2)*P2,P2,P2*2);
+  ctx.restore();
+}
+
+// ── Draw sky ─────────────────────────────────────────
 function drawSky() {
-  ctx.fillStyle = '#0d0d1a';
-  ctx.fillRect(0, 0, W, GYL);
-  // pixel grid bg
-  ctx.fillStyle = '#12122a';
-  for (let x = 0; x < W; x += 16) ctx.fillRect(x, 0, 1, GYL);
-  for (let y = 0; y < GYL; y += 16) ctx.fillRect(0, y, W, 1);
-  // stars
-  for (const s of STARS) {
-    const on = ((frame >> 3) + s.b) % 8 < 4;
-    ctx.fillStyle = on ? '#ffffff' : '#333355';
-    ctx.fillRect(s.x, s.y, 2, 2);
+  ctx.fillStyle='#0d0d1a'; ctx.fillRect(0,0,W,GYL);
+  ctx.fillStyle='#12122a';
+  for(let x=0;x<W;x+=16) ctx.fillRect(x,0,1,GYL);
+  for(let y=0;y<GYL;y+=16) ctx.fillRect(0,y,W,1);
+  for(const s of STARS) {
+    const on=((frame>>3)+s.b)%8<4;
+    ctx.fillStyle=on?'#ffffff':'#333355';
+    ctx.fillRect(s.x,s.y,2,2);
   }
 }
 
-// ── Draw: Ground ───────────────────────────────────
-function drawGround() {
-  ctx.fillStyle = '#3a2a0a';
-  ctx.fillRect(0, GYL, W, GH);
-  // stripe
-  ctx.fillStyle = '#8B6020';
-  ctx.fillRect(0, GYL, W, 5);
-  ctx.fillStyle = '#c08030';
-  ctx.fillRect(0, GYL+5, W, 5);
-  ctx.fillStyle = '#8B6020';
-  ctx.fillRect(0, GYL+10, W, 2);
-  // scrolling text
-  ctx.font = '6px "Press Start 2P",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillStyle = 'rgba(255,180,40,0.55)';
-  const txt = CFG.groundText;
-  const tw  = ctx.measureText(txt).width;
-  const ox  = W - ((gOff * 0.7) % tw);
-  ctx.fillText(txt, ox - tw, GYL + 24);
-  ctx.fillText(txt, ox,      GYL + 24);
+// ── Draw ground ──────────────────────────────────────
+function drawGround(off) {
+  ctx.fillStyle='#3a2a0a'; ctx.fillRect(0,GYL,W,GH);
+  ctx.fillStyle='#8B6020'; ctx.fillRect(0,GYL,W,5);
+  ctx.fillStyle='#c08030'; ctx.fillRect(0,GYL+5,W,5);
+  ctx.fillStyle='#8B6020'; ctx.fillRect(0,GYL+10,W,2);
+  ctx.font='6px "Press Start 2P",monospace';
+  ctx.textAlign='left';
+  ctx.fillStyle='rgba(255,180,40,0.55)';
+  const txt='HEARTBEAT OK   BITS: '+(P.bits+runBits)+'   LV '+P.level+'   ';
+  const tw=ctx.measureText(txt).width;
+  const ox2=W-((off*0.7)%tw);
+  ctx.fillText(txt,ox2-tw,GYL+24);
+  ctx.fillText(txt,ox2,GYL+24);
 }
 
-// ── Draw: Pipe ─────────────────────────────────────
-function drawPipe(x, tH, bY) {
-  const EX = 6, CAP = 18;
-  // top body
-  ctx.fillStyle = '#1a5c1a'; ctx.fillRect(x+2, 0, PW-4, tH-CAP);
-  ctx.fillStyle = '#2d8a2d'; ctx.fillRect(x+2, 0, 5,    tH-CAP);
-  ctx.fillStyle = '#0f3a0f'; ctx.fillRect(x+PW-7, 0, 5, tH-CAP);
-  // pixel highlight
-  ctx.fillStyle = '#4aaa4a'; ctx.fillRect(x+3, 0, 2, tH-CAP);
-  // top cap
-  ctx.fillStyle = '#2d8a2d'; ctx.fillRect(x-EX, tH-CAP, PW+EX*2, CAP);
-  ctx.fillStyle = '#4aaa4a'; ctx.fillRect(x-EX, tH-CAP, PW+EX*2, 4);
-  ctx.fillStyle = '#0f3a0f'; ctx.fillRect(x-EX, tH-4,   PW+EX*2, 4);
-  // bot cap
-  ctx.fillStyle = '#2d8a2d'; ctx.fillRect(x-EX, bY, PW+EX*2, CAP);
-  ctx.fillStyle = '#4aaa4a'; ctx.fillRect(x-EX, bY, PW+EX*2, 4);
-  ctx.fillStyle = '#0f3a0f'; ctx.fillRect(x-EX, bY+CAP-4, PW+EX*2, 4);
-  // bot body
-  ctx.fillStyle = '#1a5c1a'; ctx.fillRect(x+2, bY+CAP, PW-4, GYL-bY-CAP);
-  ctx.fillStyle = '#2d8a2d'; ctx.fillRect(x+2, bY+CAP, 5,    GYL-bY-CAP);
-  ctx.fillStyle = '#0f3a0f'; ctx.fillRect(x+PW-7, bY+CAP, 5, GYL-bY-CAP);
-  ctx.fillStyle = '#4aaa4a'; ctx.fillRect(x+3, bY+CAP, 2,    GYL-bY-CAP);
+// ── Draw pipe ────────────────────────────────────────
+function drawPipe(x,tH,bY) {
+  const EX=6,CAP=18;
+  ctx.fillStyle='#1a5c1a'; ctx.fillRect(x+2,0,PW-4,tH-CAP);
+  ctx.fillStyle='#2d8a2d'; ctx.fillRect(x+2,0,5,tH-CAP);
+  ctx.fillStyle='#0f3a0f'; ctx.fillRect(x+PW-7,0,5,tH-CAP);
+  ctx.fillStyle='#4aaa4a'; ctx.fillRect(x+3,0,2,tH-CAP);
+  ctx.fillStyle='#2d8a2d'; ctx.fillRect(x-EX,tH-CAP,PW+EX*2,CAP);
+  ctx.fillStyle='#4aaa4a'; ctx.fillRect(x-EX,tH-CAP,PW+EX*2,4);
+  ctx.fillStyle='#0f3a0f'; ctx.fillRect(x-EX,tH-4,PW+EX*2,4);
+  ctx.fillStyle='#2d8a2d'; ctx.fillRect(x-EX,bY,PW+EX*2,CAP);
+  ctx.fillStyle='#4aaa4a'; ctx.fillRect(x-EX,bY,PW+EX*2,4);
+  ctx.fillStyle='#0f3a0f'; ctx.fillRect(x-EX,bY+CAP-4,PW+EX*2,4);
+  ctx.fillStyle='#1a5c1a'; ctx.fillRect(x+2,bY+CAP,PW-4,GYL-bY-CAP);
+  ctx.fillStyle='#2d8a2d'; ctx.fillRect(x+2,bY+CAP,5,GYL-bY-CAP);
+  ctx.fillStyle='#0f3a0f'; ctx.fillRect(x+PW-7,bY+CAP,5,GYL-bY-CAP);
+  ctx.fillStyle='#4aaa4a'; ctx.fillRect(x+3,bY+CAP,2,GYL-bY-CAP);
 }
 
-// ── Draw: HUD ──────────────────────────────────────
-function drawHUD() {
-  // Score
-  pts('' + score, W/2, 38, 16, '#ffffff', '#00000088');
-  // Lives (pixel hearts)
-  for (let i = 0; i < CFG.lives; i++) {
-    const hx = 8 + i * 16, hy = 6;
-    ctx.fillStyle = i < lives ? '#ff4444' : '#3a1a1a';
-    [[0,1,0,1,0],[1,1,1,1,1],[0,1,1,1,0],[0,0,1,0,0]].forEach((row,r) =>
-      row.forEach((p,c) => p && ctx.fillRect(hx+c*3, hy+r*3, 3, 3))
-    );
+// ── Draw HUD ─────────────────────────────────────────
+function drawHUD(sc,lv,lf,rb,mx) {
+  pts(''+sc,W/2,38,16,'#ffffff','#00000088');
+  for(let i=0;i<mx;i++) {
+    const hx=8+i*16,hy=6;
+    ctx.fillStyle=i<lf?'#ff4444':'#3a1a1a';
+    [[0,1,0,1,0],[1,1,1,1,1],[0,1,1,1,0],[0,0,1,0,0]].forEach((row,r)=>
+      row.forEach((p,c)=>p&&ctx.fillRect(hx+c*3,hy+r*3,3,3)));
   }
-  // Level badge
-  if (level > 1) {
-    ctx.fillStyle = '#ffdd44';
-    ctx.font = '6px "Press Start 2P",monospace';
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#000';
-    ctx.fillText('LV'+level, W-5, 17);
-    ctx.fillStyle = '#ffdd44';
-    ctx.fillText('LV'+level, W-7, 15);
+  if(lv>1) { pt('LV'+lv,W-5,15,6,'#000','right'); pt('LV'+lv,W-7,13,6,'#ffdd44','right'); }
+  if(lvlFlash>0) {
+    ctx.globalAlpha=Math.min(1,lvlFlash/30);
+    pts('LEVEL '+lv+'!',W/2,H/2-20,10,'#ffdd44');
+    ctx.globalAlpha=1; lvlFlash--;
   }
-  // Level flash
-  if (lvlFlash > 0) {
-    ctx.globalAlpha = Math.min(1, lvlFlash / 30);
-    pts('LEVEL ' + level + '!', W/2, H/2 - 20, 12, '#ffdd44');
-    ctx.globalAlpha = 1;
-    lvlFlash--;
+  if(comboT>0&&comboN>=3) {
+    ctx.globalAlpha=Math.min(1,comboT/20);
+    pts('x'+comboN+' COMBO',W/2,64,7,'#ffaa00');
+    ctx.globalAlpha=1;
   }
-  // Combo
-  if (comboT > 0 && comboN >= 3) {
-    ctx.globalAlpha = Math.min(1, comboT / 20);
-    pts('x' + comboN + ' COMBO', W/2, 65, 7, '#ffaa00');
-    ctx.globalAlpha = 1;
-  }
+  if(rb>0) { pt('BITS +'+rb,W-6,H-GH-10,5,'#ffd70099','right'); }
 }
 
-// ── Draw: Title ────────────────────────────────────
-function drawTitle() {
-  // title box
-  ctx.fillStyle = '#000000aa';
-  ctx.fillRect(W/2-90, 72, 180, 64);
-  ctx.fillStyle = CFG.colors.accent;
-  ctx.fillRect(W/2-90, 72,  180, 4);
-  ctx.fillRect(W/2-90, 132, 180, 4);
-  ctx.fillRect(W/2-90, 72,  4,   64);
-  ctx.fillRect(W/2+86, 72,  4,   64);
-  pts('FLAPPY', W/2, 98,  14, '#ff8040', '#400000');
-  pts('CLAW',   W/2, 124, 14, '#ff4040', '#400000');
-
-  // lore
-  CFG.lore.forEach((l, i) => {
-    pt(l, W/2, 162 + i*14, 5, 'rgba(0,255,136,0.85)');
-  });
-
-  // tap to start
-  const p = (Math.sin(frame * 0.09) + 1) / 2;
-  ctx.globalAlpha = 0.45 + p * 0.55;
-  pts('TAP TO START', W/2, H/2 + 60, 8, CFG.colors.accent);
-  ctx.globalAlpha = 1;
-
-  if (hiScore > 0) pt('BEST ' + hiScore, W/2, H/2 + 84, 6, '#ffdd44');
-
-  // controls hint
-  pt('SPACE / TAP = FLAP', W/2, H - GH - 18, 5, 'rgba(255,255,255,0.4)');
-}
-
-// ── Draw: Dying overlay ────────────────────────────
-function drawDying() {
-  ctx.fillStyle = 'rgba(255,40,40,0.18)';
-  ctx.fillRect(0, 0, W, GYL);
-  const prog = 1 - (dTimer / 80);
-  if (prog > 0.3) {
-    ctx.globalAlpha = Math.min(1, (prog - 0.3) / 0.4);
-    pts('LIFE LOST!', W/2, H/2 - 10, 10, '#ff4444');
-    // remaining lives
-    pt(lives + ' LEFT', W/2, H/2 + 14, 8, '#ffaa44');
-    ctx.globalAlpha = 1;
+// ── Particles ────────────────────────────────────────
+function burst(x,y) {
+  const cols=['#ff4040','#ff8040','#ffcc40','#ff4088','#ffffff'];
+  for(let i=0;i<12;i++) {
+    const a=(i/12)*Math.PI*2+Math.random()*0.3,spd=2+Math.random()*3;
+    particles.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd-1,life:1,col:cols[i%5]});
   }
 }
-
-// ── Draw: Over Game ───────────────
-function drawGameOver() {
-  ctx.fillStyle = 'rgba(0,0,0,0.65)';
-  ctx.fillRect(0, 0, W, H);
-
-  const PNW = 208, PNH = 196;
-  const px = W/2-PNW/2, py = H/2-PNH/2-8;
-
-  ctx.fillStyle = '#081408';
-  ctx.fillRect(px, py, PNW, PNH);
-  // chunky pixel border
-  const bc = CFG.colors.accent;
-  ctx.fillStyle = bc; ctx.fillRect(px,       py,       PNW, 4);
-  ctx.fillStyle = bc; ctx.fillRect(px,       py+PNH-4, PNW, 4);
-  ctx.fillStyle = bc; ctx.fillRect(px,       py,       4,   PNH);
-  ctx.fillStyle = bc; ctx.fillRect(px+PNW-4, py,       4,   PNH);
-  // corner pixels (NES style)
-  ctx.fillStyle = '#000'; ctx.fillRect(px,       py,       4, 4);
-  ctx.fillStyle = '#000'; ctx.fillRect(px+PNW-4, py,       4, 4);
-  ctx.fillStyle = '#000'; ctx.fillRect(px,       py+PNH-4, 4, 4);
-  ctx.fillStyle = '#000'; ctx.fillRect(px+PNW-4, py+PNH-4, 4, 4);
-
-  pts('GAME OVER', W/2, py+26, 11, '#ff4444', '#220000');
-
-  // divider
-  ctx.fillStyle = bc + '50'; ctx.fillRect(px+10, py+36, PNW-20, 2);
-
-  pt('SCORE', W/2-44, py+52, 5, '#888');
-  pt('BEST',  W/2+44, py+52, 5, '#888');
-  pts('' + score,   W/2-44, py+76, 13, '#00ff88');
-  pts('' + hiScore, W/2+44, py+76, 13, '#ffdd44');
-
-  ctx.fillStyle = bc + '50'; ctx.fillRect(px+10, py+90, PNW-20, 2);
-
-  // rank
-  const RANKS = [[40,'S','#ff8040'],[25,'A','#ffd700'],[10,'B','#c0c0c0'],[3,'C','#cd7f32'],[0,'D','#666']];
-  const [,rk,rc] = RANKS.find(([m]) => score >= m);
-  pts('[' + rk + ']', W/2, py+124, 13, rc);
-
-  // new best
-  if (score > 0 && score >= hiScore) {
-    pts('NEW BEST!', W/2, py+148, 7, '#ffdd44', '#442200');
+function tickParticles() {
+  particles=particles.filter(p=>p.life>0);
+  for(const p of particles) {
+    p.x+=p.vx;p.y+=p.vy;p.vy+=0.18;p.life-=0.038;
+    ctx.globalAlpha=p.life;ctx.fillStyle=p.col;ctx.fillRect(p.x|0,p.y|0,4,4);
   }
-
-  // tap to retry (gated)
-  if (dTimer <= 0) {
-    const p = (Math.sin(frame * 0.1) + 1) / 2;
-    ctx.globalAlpha = 0.4 + p * 0.6;
-    pts('TAP TO RETRY', W/2, py+PNH-14, 7, CFG.colors.accent);
-    ctx.globalAlpha = 1;
-  } else {
-    // loading dots
-    const d = '.'.repeat(1 + Math.floor((90-dTimer)/30) % 3);
-    pt(d, W/2, py+PNH-14, 10, '#444');
-  }
+  ctx.globalAlpha=1;
 }
 
-// ── Particles ──────────────────────────────────────
-function burst(x, y) {
-  const cols = ['#ff4040','#ff8040','#ffcc40','#ff4088','#ffffff'];
-  for (let i = 0; i < 12; i++) {
-    const a = (i/12)*Math.PI*2 + Math.random()*0.3;
-    const spd = 2 + Math.random() * 3;
-    particles.push({x, y, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd-1,
-      life:1, col:cols[i%cols.length]});
-  }
-}
-function drawParticles() {
-  particles = particles.filter(p => p.life > 0);
-  for (const p of particles) {
-    p.x += p.vx; p.y += p.vy; p.vy += 0.18; p.life -= 0.038;
-    ctx.globalAlpha = p.life;
-    ctx.fillStyle = p.col;
-    ctx.fillRect(p.x|0, p.y|0, 4, 4);
-  }
-  ctx.globalAlpha = 1;
-}
-
-// ── Collision ──────────────────────────────────────
+// ── Collision ────────────────────────────────────────
 function hits() {
-  const R = 8;
-  if (bird.y + R >= GYL || bird.y - R <= 0) return true;
-  for (const p of pipes) {
-    if (BX+R > p.x-3 && BX-R < p.x+PW+3) {
-      if (bird.y-R < p.topH || bird.y+R > p.topH+PG) return true;
+  const R=8;
+  if(bird.y+R>=GYL||bird.y-R<=0) return true;
+  for(const p of pipes) {
+    if(BX+R>p.x-3&&BX-R<p.x+PW+3) {
+      const gap=BASE_PG+(P.upgrades.wideGap*BASE_PG*0.15)+fx.gapBonus;
+      if(bird.y-R<p.topH||bird.y+R>p.topH+gap) return true;
     }
   }
   return false;
 }
 
-// ── Input ──────────────────────────────────────────
-let lastTap = 0;
-function tap() {
-  const now = Date.now();
-  if (now - lastTap < 100) return; // debounce: ignore within 100ms
-  lastTap = now;
-  if (state === 'title') {
-    state = 'playing'; bird.vy = FLAPV;
-  } else if (state === 'playing') {
-    bird.vy = FLAPV; bird.t = 0;
-  } else if (state === 'dying') {
-    // no input during dying
-  } else if (state === 'gameover') {
-    if (dTimer > 0) return;
-    newGame(); state = 'playing'; bird.vy = FLAPV;
+// ── Pick pit stop cards ──────────────────────────────
+function pickCards() {
+  const pool=[...CARDS];
+  const picked=[];
+  for(let i=0;i<3&&pool.length;i++) {
+    const idx=Math.floor(Math.random()*pool.length);
+    picked.push(pool.splice(idx,1)[0]);
+  }
+  return picked;
+}
+
+// ── Apply card ───────────────────────────────────────
+function applyCard(card) {
+  if(card.id==='ghost')      fx.ghost=1;
+  if(card.id==='shield')     fx.shield=true;
+  if(card.id==='widegap')    fx.gapBonus+=BASE_PG*0.3;
+  if(card.id==='slowtime')   fx.slowTimer=600;
+  if(card.id==='turboflap')  fx.turboTimer=480;
+  if(card.id==='doublebits') fx.doubleBitsTimer=720;
+  if(card.id==='extralife')  lives=Math.min(lives+1,6);
+}
+
+// ── CRT scanlines ────────────────────────────────────
+function drawCRT() {
+  ctx.fillStyle='rgba(0,0,0,0.06)';
+  for(let y=0;y<H;y+=3) ctx.fillRect(0,y,W,1);
+}
+
+// ── Draw: Panel ────────
+function drawPanel(x,y,w,h,bg,border) {
+  ctx.fillStyle=bg||'#081408'; ctx.fillRect(x,y,w,h);
+  ctx.fillStyle=border||'#00ff88';
+  ctx.fillRect(x,y,w,4);ctx.fillRect(x,y+h-4,w,4);
+  ctx.fillRect(x,y,4,h);ctx.fillRect(x+w-4,y,4,h);
+  ctx.fillStyle='#000';
+  ctx.fillRect(x,y,4,4);ctx.fillRect(x+w-4,y,4,4);
+  ctx.fillRect(x,y+h-4,4,4);ctx.fillRect(x+w-4,y+h-4,4,4);
+}
+
+// ── Button helper ────────────────────────────────────
+const BTN_RECTS = {};
+function drawBtn(id,label,x,y,w,h,col,active) {
+  BTN_RECTS[id]={x,y,w,h};
+  ctx.fillStyle=active?col:(col+'99');
+  ctx.fillRect(x,y,w,h);
+  ctx.fillStyle='#000a';
+  ctx.fillRect(x,y+h-3,w,3);
+  pt(label,x+w/2,y+h/2+3,6,active?'#000':'#000a');
+}
+function hitBtn(id) {
+  if(!tapPos) return false;
+  const r=BTN_RECTS[id];
+  if(!r) return false;
+  return tapPos.x>=r.x&&tapPos.x<=r.x+r.w&&tapPos.y>=r.y&&tapPos.y<=r.y+r.h;
+}
+
+// ── HOME SCREEN ──────────────────────────────────────
+const homeScrollY = { v:0 };
+function drawHome() {
+  drawSky();
+  drawGround(frame*0.5);
+
+  // animated claw preview
+  const sk=SKINS[P.equippedSkin]||SKINS.default;
+  const by=H/2-110+Math.sin(frame*0.05)*6;
+  if(sk.glow) { ctx.shadowColor=sk.glow; ctx.shadowBlur=12; }
+  drawBird(W/2,by,0,frame,false,P.equippedSkin);
+  ctx.shadowBlur=0;
+
+  // title
+  pts('FLAPPY',W/2,H/2-60,13,'#ff8040','#400000');
+  pts('CLAW',  W/2,H/2-40,13,'#ff4040','#400000');
+
+  // stats panel
+  const py=H/2-15, ph=72, pw=220, px=W/2-pw/2;
+  drawPanel(px,py,pw,ph,'#000d','#00ff88');
+  pt('LV '+P.level,  px+pw*0.18, py+18, 6, '#ffdd44');
+  pt('BEST',         px+pw*0.5,  py+14, 5, '#666');
+  pt(''+P.highScore, px+pw*0.5,  py+28, 8, '#fff');
+  pt('BITS',         px+pw*0.82, py+14, 5, '#666');
+  pt(''+P.bits,      px+pw*0.82, py+28, 8, '#ffd700');
+  pt('RUNS '+P.totalRuns, W/2, py+52, 5, '#555');
+
+  // XP bar
+  const xpNeed=xpToNext(P.level);
+  const xpFrac=Math.min(1,P.xp%xpNeed/xpNeed);
+  ctx.fillStyle='#111'; ctx.fillRect(px+8,py+60,pw-16,6);
+  ctx.fillStyle='#00ff88'; ctx.fillRect(px+8,py+60,Math.floor((pw-16)*xpFrac),6);
+
+  // play button
+  drawBtn('play','> PLAY <',W/2-60,H/2+66,120,28,'#00ff88',true);
+
+  // skin cycle button
+  const lockedSkins=SKIN_ORDER.filter(id=>id!=='default'&&!P.unlockedSkins.includes(id));
+  const nextUnlock=lockedSkins[0];
+  const nextSkin=SKINS[nextUnlock];
+  const skinY=H/2+102;
+  drawBtn('skin','SKIN: '+(sk.name.slice(0,6)),W/2-60,skinY,120,22,'#8888ff',true);
+  if(nextSkin) pt('LV'+nextSkin.unlockLv+' → '+nextSkin.name.slice(0,8),W/2,skinY+36,5,'#554');
+
+  drawCRT();
+
+  if(tapPos) {
+    if(hitBtn('play')) { newRun(); state='playing'; bird.vy=BASE_FLAPV; }
+    else if(hitBtn('skin')) {
+      const unlocked=P.unlockedSkins;
+      const cur=unlocked.indexOf(P.equippedSkin);
+      P.equippedSkin=unlocked[(cur+1)%unlocked.length];
+      persist(P);
+    }
+    tapPos=null;
   }
 }
 
-document.addEventListener('keydown', e => {
-  if (['Space','ArrowUp','KeyW'].includes(e.code)) { e.preventDefault(); tap(); }
-});
-canvas.addEventListener('touchstart', e => { e.preventDefault(); tap(); }, { passive: false });
-canvas.addEventListener('mousedown',  e => { if (e.button === 0) tap(); });
+// ── PLAYING ──────────────────────────────────────────
+function tickPlaying() {
+  const slow=fx.slowTimer>0?0.6:1;
+  const spd=(1.8+(runLevel-1)*0.12)*slow;
+  gOff+=spd;
+  if(fx.slowTimer>0) fx.slowTimer--;
+  if(fx.turboTimer>0) fx.turboTimer--;
+  if(fx.doubleBitsTimer>0) fx.doubleBitsTimer--;
 
-// ── Loop ───────────────────────────────────────────
-function loop() {
-  frame++;
-  const spd = 1.8 + (level-1) * 0.12;
-
-  if (state === 'playing') {
-    gOff += spd;
-    if (frame % PINT === 0) {
-      const mn = 55, mx = GYL - PG - 55;
-      pipes.push({ x: W+PW, topH: mn + Math.random()*(mx-mn), scored: false });
-    }
-    bird.vy += GRAV; bird.y += bird.vy; bird.t++;
-    bird.angle = Math.min(Math.PI/3, Math.max(-Math.PI/5, bird.vy * 0.09));
-
-    for (const p of pipes) {
-      p.x -= spd;
-      if (!p.scored && p.x+PW < BX) {
-        p.scored = true; score++; lvlPts++; comboN++; comboT = 55;
-        if (score > hiScore) hiScore = score;
-        if (lvlPts >= 10) { level++; lvlPts = 0; lvlFlash = 80; }
-      }
-    }
-    pipes = pipes.filter(p => p.x > -PW-10);
-    comboT = Math.max(0, comboT-1);
-
-    if (hits()) {
-      burst(BX, bird.y); lives--; dTimer = 80;
-      state = lives > 0 ? 'dying' : 'gameover';
-    }
-
-  } else if (state === 'dying') {
-    dTimer--;
-    gOff += 0.4;
-    bird.vy += GRAV; bird.y = Math.min(bird.y + bird.vy, GYL - 10);
-    if (dTimer <= 0) { respawn(); state = 'playing'; }
-
-  } else if (state === 'gameover') {
-    dTimer = Math.max(0, dTimer-1);
-    gOff += 0.2;
-    bird.y = Math.min(bird.y + 2, GYL - 10);
-
-  } else if (state === 'title') {
-    gOff += 0.5;
-    bird.y = H/2 - 30 + Math.sin(frame * 0.05) * 8;
+  if(frame%PINT===0) {
+    const mn=55,mx=GYL-BASE_PG-55;
+    pipes.push({x:W+PW, topH:mn+Math.random()*(mx-mn), scored:false});
   }
 
-  // ── Render ─────────────────────────────────────
+  const fv=BASE_FLAPV*(1+(P.upgrades.flapBoost*0.15))*(fx.turboTimer>0?1.3:1);
+  bird.vy+=GRAV; bird.y+=bird.vy; bird.t++;
+  bird.angle=Math.min(Math.PI/3,Math.max(-Math.PI/5,bird.vy*0.09));
+
+  for(const p of pipes) {
+    p.x-=spd;
+    if(!p.scored&&p.x+PW<BX) {
+      p.scored=true; score++; runLvlPts++;
+      const b=fx.doubleBitsTimer>0?2:1; runBits+=b;
+      comboN++;comboT=55;
+      if((P.bits+runBits)>P.bits||true) {} // track live
+      if(score>P.highScore) P.highScore=score;
+      if(runLvlPts>=10) { runLevel++;runLvlPts=0;lvlFlash=80; }
+    }
+  }
+  pipes=pipes.filter(p=>p.x>-PW-10);
+  comboT=Math.max(0,comboT-1);
+  if(comboN>P.bestCombo) P.bestCombo=comboN;
+
+  // pit stop trigger
+  if(score>0&&score%10===0&&score!==0&&!pipes.some(p=>p.scored&&p.x<BX)) {
+    // only trigger once per milestone
+    const lastPipe=pipes[pipes.length-1];
+    if(lastPipe&&lastPipe.scored) {
+      pitCards=pickCards(); state='pitstop'; pitPicked=false; return;
+    }
+  }
+
+  if(hits()) {
+    if(fx.ghost>0) { fx.ghost--; return; }
+    if(fx.shield) { fx.shield=false; return; }
+    burst(BX,bird.y); lives--;
+    if(lives>0) { dTimer=80; state='dying'; }
+    else { startGameOver(); }
+  }
+}
+
+function drawPlaying() {
   drawSky();
-  for (const p of pipes) drawPipe(p.x, p.topH, p.topH+PG);
-  drawGround();
-  drawParticles();
+  for(const p of pipes) drawPipe(p.x,p.topH,p.topH+BASE_PG+(P.upgrades.wideGap*BASE_PG*0.15)+fx.gapBonus);
+  drawGround(gOff);
+  tickParticles();
+  drawBird(BX,bird.y|0,bird.angle,bird.t,false,P.equippedSkin);
+  const maxL=3+P.upgrades.extraLife;
+  drawHUD(score,runLevel,lives,runBits,maxL);
+  // fx icons
+  let fxi=0;
+  if(fx.shield)    { pt('S',8+fxi*14,H-GH-8,6,'#4080ff'); fxi++; }
+  if(fx.ghost>0)   { pt('G',8+fxi*14,H-GH-8,6,'#a0a0ff'); fxi++; }
+  if(fx.slowTimer>0)  { pt('T',8+fxi*14,H-GH-8,6,'#ff80ff'); fxi++; }
+  if(fx.turboTimer>0) { pt('F',8+fxi*14,H-GH-8,6,'#ff8040'); fxi++; }
+  if(fx.doubleBitsTimer>0) { pt('$',8+fxi*14,H-GH-8,6,'#ffd700'); fxi++; }
+  drawCRT();
+}
 
-  ctx.save();
-  ctx.translate(BX, bird.y|0);
-  ctx.rotate(state==='gameover' ? Math.PI/2 : bird.angle);
-  CFG.drawPlayer(ctx, bird.t, state==='gameover');
-  ctx.restore();
+// ── STOP PIT ──────────────────
+function drawPitStop() {
+  drawSky();
+  for(const p of pipes) drawPipe(p.x,p.topH,p.topH+BASE_PG+(P.upgrades.wideGap*BASE_PG*0.15));
+  drawGround(gOff);
+  drawBird(BX,bird.y|0,0,bird.t,false,P.equippedSkin);
 
-  if (state === 'playing')  { drawHUD(); }
-  if (state === 'dying')    { drawHUD(); drawDying(); }
-  if (state === 'gameover') { drawHUD(); drawGameOver(); }
-  if (state === 'title')    { drawHUD(); drawTitle(); }
+  ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.fillRect(0,0,W,H);
 
-  // CRT scanlines
-  ctx.fillStyle = 'rgba(0,0,0,0.06)';
-  for (let y = 0; y < H; y += 3) ctx.fillRect(0, y, W, 1);
+  pts('PIT STOP',W/2,52,10,'#ffd700');
+  pt('SCORE: '+score,W/2,70,6,'#aaa');
 
+  const cw=76,ch=90,gap=8,startX=(W-(cw*3+gap*2))/2;
+  const cardY=86;
+  const CARD_RECTS=[];
+  for(let i=0;i<pitCards.length;i++) {
+    const c=pitCards[i];
+    const cx2=startX+i*(cw+gap);
+    CARD_RECTS.push({x:cx2,y:cardY,w:cw,h:ch,card:c});
+    drawPanel(cx2,cardY,cw,ch,'#0a0a18',c.col);
+    // icon circle
+    ctx.fillStyle=c.col+'44'; ctx.fillRect(cx2+cw/2-12,cardY+8,24,24);
+    pt(c.icon,cx2+cw/2,cardY+26,10,c.col);
+    // name (split on space)
+    const words=c.name.split(' ');
+    words.forEach((w,wi)=>pt(w,cx2+cw/2,cardY+42+wi*11,5,c.col));
+    // desc
+    const dlines=c.desc.split('/');
+    dlines.forEach((dl,di)=>pt(dl.trim(),cx2+cw/2,cardY+70+di*9,4,'#888'));
+  }
+  drawBtn('pitskip','SKIP',W/2-30,200,60,20,'#444',true);
+  drawCRT();
+
+  if(tapPos) {
+    let picked=false;
+    for(const r of CARD_RECTS) {
+      if(tapPos.x>=r.x&&tapPos.x<=r.x+r.w&&tapPos.y>=r.y&&tapPos.y<=r.y+r.h) {
+        applyCard(r.card); picked=true; break;
+      }
+    }
+    if(!picked&&hitBtn('pitskip')) picked=true;
+    if(picked) { state='playing'; pitPicked=true; }
+    tapPos=null;
+  }
+}
+
+// ── DYING ────────────────────────────────────────────
+function tickDying() {
+  dTimer--;
+  gOff+=0.4;
+  bird.vy+=GRAV; bird.y=Math.min(bird.y+bird.vy,GYL-10);
+  if(dTimer<=0) { respawn(); state='playing'; }
+}
+function drawDying() {
+  drawSky();
+  for(const p of pipes) drawPipe(p.x,p.topH,p.topH+BASE_PG+(P.upgrades.wideGap*BASE_PG*0.15));
+  drawGround(gOff);
+  tickParticles();
+  drawBird(BX,bird.y|0,Math.PI/2,bird.t,true,P.equippedSkin);
+  ctx.fillStyle='rgba(255,40,40,0.2)'; ctx.fillRect(0,0,W,GYL);
+  const maxL=3+P.upgrades.extraLife;
+  drawHUD(score,runLevel,lives,runBits,maxL);
+  const prog=1-(dTimer/80);
+  if(prog>0.3) {
+    ctx.globalAlpha=Math.min(1,(prog-0.3)/0.4);
+    pts('LIFE LOST!',W/2,H/2-10,10,'#ff4444');
+    pt(lives+' LEFT',W/2,H/2+14,8,'#ffaa44');
+    ctx.globalAlpha=1;
+  }
+  drawCRT();
+}
+
+// ── OVER GAME ─────
+function startGameOver() {
+  goXpBefore=P.xp; goRunBits=runBits;
+  const xpGain=Math.floor(score*10*(1+P.upgrades.xpBoost*0.25));
+  P.xp+=xpGain; goXpGain=xpGain;
+  P.bits+=runBits; P.totalRuns++;
+  goNewLevel=false; goNewSkins=[];
+  while(P.xp>=xpToNext(P.level)) {
+    P.xp-=xpToNext(P.level); P.level++; goNewLevel=true;
+    SKIN_ORDER.forEach(sid=>{
+      const sk=SKINS[sid];
+      if(sk.unlockLv&&P.level>=sk.unlockLv&&!P.unlockedSkins.includes(sid)) {
+        P.unlockedSkins.push(sid); goNewSkins.push(sid);
+      }
+    });
+  }
+  persist(P);
+  dTimer=90; goTimer=0; goCanInput=false;
+  state='gameover';
+}
+
+function drawGameOver() {
+  drawSky(); drawGround(gOff);
+  drawBird(BX,Math.min(bird.y+goTimer*1.5,GYL-10)|0,Math.PI/2,0,true,P.equippedSkin);
+  ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(0,0,W,H);
+
+  const PNW=220,PNH=220,px=W/2-PNW/2,py=H/2-PNH/2-10;
+  drawPanel(px,py,PNW,PNH,'#060c06','#00ff88');
+
+  pts('GAME OVER',W/2,py+24,10,'#ff4444','#220000');
+  ctx.fillStyle='#00ff8830'; ctx.fillRect(px+10,py+34,PNW-20,2);
+
+  pt('SCORE',W/2-50,py+50,5,'#666');
+  pt('BEST', W/2+50,py+50,5,'#666');
+  pts(''+score,     W/2-50,py+72,12,'#00ff88');
+  pts(''+P.highScore,W/2+50,py+72,12,'#ffdd44');
+
+  ctx.fillStyle='#00ff8830'; ctx.fillRect(px+10,py+86,PNW-20,2);
+
+  // bits earned
+  pts('+'+goRunBits+' BITS',W/2,py+104,8,'#ffd700');
+
+  // XP bar
+  const xpNeed=xpToNext(P.level);
+  const xpFrac=Math.min(1,P.xp/xpNeed);
+  pt('XP',px+20,py+120,5,'#555','left');
+  ctx.fillStyle='#111'; ctx.fillRect(px+36,py+113,PNW-52,8);
+  const barW=Math.floor((PNW-52)*xpFrac);
+  ctx.fillStyle='#00ff88'; ctx.fillRect(px+36,py+113,barW,8);
+  pt('+'+goXpGain,px+PNW-14,py+120,5,'#00ff8880','right');
+
+  if(goNewLevel) pts('LEVEL UP! LV'+P.level,W/2,py+138,7,'#ffdd44');
+  else pt('LV '+P.level,W/2,py+138,6,'#888');
+
+  if(goNewSkins.length>0) pt('UNLOCKED: '+(SKINS[goNewSkins[0]].name.slice(0,8)),W/2,py+154,5,'#ffd700');
+
+  // rank
+  const RANKS=[[40,'S','#ff8040'],[25,'A','#ffd700'],[10,'B','#c0c0c0'],[3,'C','#cd7f32'],[0,'D','#666']];
+  const [,rk,rc]=RANKS.find(([m])=>score>=m);
+  pts('['+rk+']',W/2,py+170,9,rc);
+
+  if(score>=P.highScore&&score>0) pts('NEW BEST!',W/2,py+188,6,'#ffdd44','#442200');
+
+  if(goCanInput) {
+    drawBtn('goShop','SHOP',W/2-68,py+PNH+4,60,24,'#ffd700',true);
+    drawBtn('goPlay','RETRY',W/2+8,py+PNH+4,60,24,'#00ff88',true);
+  } else {
+    const dots='.'.repeat(1+Math.floor((90-dTimer)/30)%3);
+    pt(dots,W/2,py+PNH+18,10,'#333');
+  }
+  drawCRT();
+
+  if(tapPos&&goCanInput) {
+    if(hitBtn('goShop'))  { state='shop'; tapPos=null; }
+    else if(hitBtn('goPlay')) { newRun(); state='playing'; bird.vy=BASE_FLAPV; tapPos=null; }
+    else tapPos=null;
+  } else tapPos=null;
+}
+
+// ── SHOP ────────────────────────────────────────────
+function drawShop() {
+  drawSky(); drawGround(0);
+  ctx.fillStyle='rgba(0,0,0,0.85)'; ctx.fillRect(0,0,W,H);
+
+  pts('UPGRADE SHOP',W/2,36,9,'#ffd700');
+  pts('BITS: '+P.bits,W/2,56,7,'#ffd700');
+  ctx.fillStyle='#ffd70030'; ctx.fillRect(20,62,W-40,2);
+
+  SHOP_ITEMS.forEach((item,i)=>{
+    const iy=74+i*52;
+    const owned=P.upgrades[item.id]||0;
+    const maxed=owned>=item.max;
+    const canBuy=!maxed&&P.bits>=item.cost;
+    const bg=maxed?'#101808':(canBuy?'#081408':'#0d0a04');
+    const border=maxed?'#00ff8860':(canBuy?'#00ff88':'#554');
+    drawPanel(16,iy,W-32,44,bg,border);
+    pt(item.name,68,iy+14,6,canBuy?'#fff':'#666','left');
+    pt(item.desc,68,iy+28,5,canBuy?'#888':'#444','left');
+    pt(owned+'/'+item.max,W-56,iy+14,5,'#555','left');
+    if(maxed) { drawBtn('buy'+i,'MAX',W-42,iy+10,28,20,'#222',false); }
+    else { drawBtn('buy'+i,item.cost+'B',W-42,iy+10,28,20,canBuy?'#ffd700':'#333',canBuy); }
+  });
+
+  drawBtn('shopback','< BACK',W/2-36,H-GH-36,72,24,'#888',true);
+  drawCRT();
+
+  if(tapPos) {
+    SHOP_ITEMS.forEach((item,i)=>{
+      if(hitBtn('buy'+i)) {
+        const owned=P.upgrades[item.id]||0;
+        if(owned<item.max&&P.bits>=item.cost) {
+          P.bits-=item.cost; P.upgrades[item.id]=(owned+1); persist(P);
+        }
+      }
+    });
+    if(hitBtn('shopback')) { state='home'; }
+    tapPos=null;
+  }
+}
+
+// ── INPUT ────────────────────────────────────────────
+let lastTap=0;
+let rawTapPos=null;
+function onTap(lx,ly) {
+  const now=Date.now();
+  if(now-lastTap<100) return;
+  lastTap=now;
+  tapPos={x:lx,y:ly};
+  if(state==='playing') { bird.vy=BASE_FLAPV*(1+(P.upgrades.flapBoost*0.15))*(fx.turboTimer>0?1.3:1); }
+  if(state==='dying')   {}
+}
+canvas.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  const r=canvas.getBoundingClientRect();
+  const t=e.changedTouches[0];
+  onTap((t.clientX-r.left)/scale,(t.clientY-r.top)/scale);
+},{passive:false});
+canvas.addEventListener('mousedown',e=>{
+  if(e.button!==0) return;
+  const r=canvas.getBoundingClientRect();
+  onTap((e.clientX-r.left)/scale,(e.clientY-r.top)/scale);
+});
+document.addEventListener('keydown',e=>{
+  if(['Space','ArrowUp','KeyW'].includes(e.code)) { e.preventDefault(); onTap(W/2,H/2); }
+});
+
+// ── MAIN LOOP ────────────────────────────────────────
+function loop() {
+  frame++;
+  if(state==='playing')  { tickPlaying(); drawPlaying(); }
+  else if(state==='pitstop') { drawPitStop(); }
+  else if(state==='dying')   { tickDying();  drawDying();  }
+  else if(state==='gameover'){
+    goTimer++;
+    dTimer=Math.max(0,dTimer-1);
+    if(dTimer<=0) goCanInput=true;
+    gOff+=0.2;
+    drawGameOver();
+  }
+  else if(state==='home') { frame++; drawHome(); }
+  else if(state==='shop') { drawShop(); }
   requestAnimationFrame(loop);
 }
 
-// Wait for Press Start 2P to load
-document.fonts.ready.then(() => requestAnimationFrame(loop));
+document.fonts.ready.then(()=>requestAnimationFrame(loop));
 </script>
 </body>
 </html>

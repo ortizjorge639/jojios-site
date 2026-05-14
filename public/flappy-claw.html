@@ -2,804 +2,482 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Flappy Claw</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body {
-      background: #000;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      touch-action: none;
-    }
-    body {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      /* Fix mobile Safari 100vh including browser chrome */
-      min-height: -webkit-fill-available;
-      min-height: 100dvh;
-    }
-    canvas { display: block; image-rendering: pixelated; touch-action: none; }
+    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; touch-action: none; }
+    body { display: flex; justify-content: center; align-items: center; min-height: 100dvh; min-height: -webkit-fill-available; }
+    canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; cursor: pointer; }
   </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <script>
-// ═══════════════════════════════════════════════════════════════════
-//  AGENT_CONFIG  — swap this block to create your own Flappy Agent
-//
-//  To fork: copy this file, edit AGENT_CONFIG only.
-//  See AGENT_README.md for the full guide.
-// ═══════════════════════════════════════════════════════════════════
-const AGENT_CONFIG = {
-
-  // ── identity Game ────────────
-  title:         'FLAPPY CLAW',
-  scoreLabel:    'heartbeats',
-  deathTitle:    'PROCESS KILLED',
-  deathSubtitle: 'exit code: 1  |  signal: SIGPIPE',
-  startPrompt:   '[ TAP TO DEPLOY ]',
-  restartPrompt: '[ TAP TO RESPAWN ]',
-  highScoreKey:  'flappy_claw_hs',   // localStorage key (unique per agent)
-
-  // ── Idle screen lore lines (shown behind the bird on start) ─────
-  loreLines: [
-    'CONTAINER: main',
-    'NODE: azure-vm-01',
-    'MODE: BUILD',
-    'LEVEL: 96',
-  ],
-
-  // ── Scrolling ground text ────────────────────────────────────────
-  groundPrompts: [
-    '$ heartbeat --ok',
-    '$ level 96',
-    '$ node main.js',
-    '$ git push',
-    '$ deploy --vercel',
-  ],
-
-  // ── Rank thresholds [minScore, label, color] 
-  ranks: [
-    [50, 'S', '#ff6030'],
-    [30, 'A', '#ffd700'],
-    [15, 'B', '#c0c0c0'],
-    [5,  'C', '#cd7f32'],
-    [0,  'D', '#888'],
-  ],
-
-  // ── Particle burst colors on death ──────────────────────────────
-  particleColors: ['#ff6030', '#ff3010', '#ff8050', '#ffaa40'],
-
-  // ── Color theme ─────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════
+//  AGENT_CONFIG — edit this block to fork the game
+// ═══════════════════════════════════════════════════
+const CFG = {
+  title:       'FLAPPY\nCLAW',
+  lore:        ['AGENT: CLAW', 'LEVEL: 96', 'NODE: AZURE'],
+  groundText:  'HEARTBEAT OK   LEVEL 96   DEPLOY   ',
+  lives:       3,
   colors: {
-    skyTop:       '#0a0a1e',
-    skyMid:       '#0d1b3e',
-    skyBot:       '#122444',
-    accent:       '#00ff44',      // pipe glow, panel border, LEDs
-    accentDim:    '#00ff4430',
-    score:        '#00ff88',
-    title:        '#ff8050',
-    titleGlow:    '#ff6030',
-    ground:       '#0d0d0d',
-    groundLine:   '#1a2a1a',
-    groundText:   'rgba(0,255,80,0.35)',
-    panelBg:      '#0a1a0a',
-    deathRed:     '#ff4040',
-    bestGold:     '#ffcc44',
-    bgRack:       'rgba(30,50,90,0.6)',
+    accent:  '#00ff88',
+    player:  '#e84040',
+    player2: '#cc2020',
+    eye:     '#ffffff',
   },
-
-  // ── Player sprite ────────────────────────────────────────────────
-  // Called each frame. ctx is pre-translated to bird center, pre-rotated.
-  // flapFrame: ever-incrementing counter for animation
-  // dead: true after collision
-  drawPlayer(ctx, flapFrame, dead) {
-    const t = flapFrame;
-    const clawAngle = Math.sin(t * 0.4) * 0.3;
-    const eyeWobble = Math.sin(t * 0.15) * 1;
-
+  // drawPlayer: ctx pre-translated to bird center, pre-rotated
+  drawPlayer(ctx, t, dead) {
+    const P = 3;
+    const c1 = dead ? '#884040' : '#e84040';
+    const c2 = dead ? '#661818' : '#cc2020';
+    // pixel grid: 0=skip 1=body 2=eye 3=dark
+    const G = [
+      [0,0,1,1,1,0,0],
+      [0,1,1,2,1,1,0],
+      [1,3,1,1,1,3,1],
+      [1,1,1,1,1,1,1],
+      [0,1,1,1,1,1,0],
+      [0,0,1,0,1,0,0],
+    ];
+    const ox = -(G[0].length * P) / 2;
+    const oy = -(G.length * P) / 2;
+    for (let r = 0; r < G.length; r++) {
+      for (let c = 0; c < G[r].length; c++) {
+        const v = G[r][c];
+        if (!v) continue;
+        ctx.fillStyle = v === 2 ? '#fff' : v === 3 ? c2 : c1;
+        ctx.fillRect(ox + c*P, oy + r*P, P, P);
+      }
+    }
+    // claws
     if (!dead) {
-      ctx.shadowColor = '#ff6030';
-      ctx.shadowBlur = 8;
+      ctx.fillStyle = c2;
+      ctx.fillRect(ox + 7*P, oy + P,   P*2, P*2);
+      ctx.fillRect(ox - P*2, oy + 3*P, P*2, P*2);
     }
-
-    // Tail fan
-    ctx.fillStyle = '#cc3010';
-    for (let i = -2; i <= 2; i++) {
-      ctx.save();
-      ctx.rotate(i * 0.18);
-      ctx.fillRect(-18, -4, 10, 5);
-      ctx.restore();
-    }
-
-    // Body segments
-    for (const [sx, sy, sw, sh] of [[0,0,14,12],[6,0,10,10],[10,1,8,8]]) {
-      ctx.fillStyle = '#e04020';
-      ctx.beginPath();
-      ctx.ellipse(-sx, sy, sw/2, sh/2, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#aa2010';
-      ctx.lineWidth = 0.8;
-      ctx.stroke();
-    }
-
-    // Shell highlight
-    ctx.fillStyle = 'rgba(255,150,100,0.25)';
-    ctx.beginPath();
-    ctx.ellipse(-2, -3, 8, 5, -0.2, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Big left claw
-    ctx.save();
-    ctx.rotate(-clawAngle);
-    ctx.fillStyle = '#cc3010';
-    ctx.beginPath();
-    ctx.ellipse(10, -8, 9, 6, -0.6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#e04020';
-    ctx.beginPath();
-    ctx.moveTo(16, -10); ctx.lineTo(22, -14); ctx.lineTo(20, -8); ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#aa2010';
-    ctx.beginPath();
-    ctx.moveTo(16, -6); ctx.lineTo(21, -4); ctx.lineTo(19, -8); ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-
-    // Small right claw
-    ctx.save();
-    ctx.rotate(clawAngle);
-    ctx.fillStyle = '#cc3010';
-    ctx.beginPath();
-    ctx.ellipse(8, 8, 6, 4, 0.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    // Left eye stalk
-    ctx.fillStyle = '#cc3010';
-    ctx.fillRect(12, -13 + eyeWobble, 3, 6);
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.arc(13.5, -14 + eyeWobble, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#000';
-    ctx.beginPath();
-    ctx.arc(14.5, -14.5 + eyeWobble, 2, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.arc(15, -15.5 + eyeWobble, 0.8, 0, Math.PI * 2); ctx.fill();
-
-    // Right eye stalk
-    ctx.fillStyle = '#cc3010';
-    ctx.fillRect(7, -12 + eyeWobble, 3, 5);
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.arc(8.5, -13 + eyeWobble, 3, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#000';
-    ctx.beginPath();
-    ctx.arc(9, -13.5 + eyeWobble, 1.5, 0, Math.PI * 2); ctx.fill();
-
-    // Antennae
-    ctx.strokeStyle = '#ff7050';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(14, -17 + eyeWobble);
-    ctx.quadraticCurveTo(20, -28, 26, -22);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(9, -15 + eyeWobble);
-    ctx.quadraticCurveTo(14, -26, 18, -20);
-    ctx.stroke();
-
-    ctx.shadowBlur = 0;
+    // antennae
+    const fl = Math.floor(t/8) % 2;
+    ctx.fillStyle = c2;
+    ctx.fillRect(ox + 2*P, oy - (fl?2:1)*P, P, P*2);
+    ctx.fillRect(ox + 4*P, oy - (fl?1:2)*P, P, P*2);
   },
 };
-// ═══════════════════════════════════════════════════════════════════
-//  ENGINE  — do not edit below unless modifying game mechanics
-// ═══════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════
+//  ENGINE
+// ═════════════════
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
 
-const BASE_W = 288, BASE_H = 512;
+const W = 288, H = 512;
 let scale = 1;
 
 function resize() {
-  // Use visualViewport if available (accurate on mobile Safari)
-  const vw = window.visualViewport ? window.visualViewport.width  : window.innerWidth;
-  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  const s = Math.min(vw / BASE_W, vh / BASE_H);
-  scale = s;
-  canvas.width  = Math.floor(BASE_W * s);
-  canvas.height = Math.floor(BASE_H * s);
-  ctx.setTransform(s, 0, 0, s, 0, 0);
+  const vp = window.visualViewport;
+  const vw = vp ? vp.width  : window.innerWidth;
+  const vh = vp ? vp.height : window.innerHeight;
+  scale = Math.min(vw / W, vh / H);
+  canvas.width  = Math.floor(W * scale);
+  canvas.height = Math.floor(H * scale);
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.imageSmoothingEnabled = false;
 }
 resize();
 window.addEventListener('resize', resize);
 if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
 
-// Physics constants
-const GRAVITY    = 0.25;
-const FLAP_V     = -4.6;
-const PIPE_W     = 52;
-const PIPE_GAP   = 108;
-const PIPE_SPEED = 1.6;
-const GROUND_H   = 80;
-const GROUND_Y   = BASE_H - GROUND_H;
-const BIRD_X     = 60;
-const BIRD_R     = 13;
-const PIPE_INTERVAL = 90;
+// Constants
+const GRAV  = 0.28;
+const FLAPV = -5.0;
+const PW    = 52;
+const PG    = 118;
+const GH    = 72;
+const GYL   = H - GH;
+const BX    = 70;
+const PINT  = 88;
 
-// State
-let state = 'idle';
-let bird, pipes, score, frame, groundOffset = 0;
-let deathFrame = 0, shakeX = 0, shakeY = 0;
+// State machine: 'title' | 'playing' | 'dying' | 'gameover'
+let state = 'title';
+let bird, pipes, score, frame, gOff, lives, level, lvlPts, comboN, comboT, dTimer;
+let hiScore = 0;
 let particles = [];
-let highScore = parseInt(localStorage.getItem(AGENT_CONFIG.highScoreKey) || '0', 10);
+let lvlFlash = 0;
 
-// Stars (generated once)
-const stars = Array.from({ length: 40 }, () => ({
-  x:     Math.random() * BASE_W,
-  y:     Math.random() * GROUND_Y * 0.7,
-  r:     Math.random() * 1.5 + 0.3,
-  blink: Math.random() * Math.PI * 2,
+function newGame() {
+  bird   = { y: H/2 - 30, vy: 0, angle: 0, t: 0 };
+  pipes  = [];
+  score  = 0; frame = 0; gOff = 0;
+  lives  = CFG.lives;
+  level  = 1; lvlPts = 0;
+  comboN = 0; comboT = 0;
+  particles = [];
+  lvlFlash = 0;
+}
+newGame();
+
+function respawn() {
+  bird = { y: H/2 - 30, vy: 0, angle: 0, t: 0 };
+  pipes = pipes.filter(p => p.x > BX + 120);
+  comboN = 0;
+}
+
+// ── Stars ──────────────────────────────────────────
+const STARS = Array.from({length: 40}, () => ({
+  x: Math.random() * W | 0,
+  y: Math.random() * GYL * 0.85 | 0,
+  b: Math.random() * 8 | 0,
 }));
 
-// Score pop animation
-let scorePop = 0; // decays from 1 → 0 for pop effect
-
-function reset() {
-  bird = { y: BASE_H / 2 - 20, vy: 0, angle: 0, flapFrame: 0, dead: false };
-  pipes = [];
-  score = 0;
-  frame = 0;
-  particles = [];
-  shakeX = shakeY = 0;
+// ── Font helper ────────────────────────────────────
+function pt(txt, x, y, sz, col, align) {
+  ctx.font = sz + 'px "Press Start 2P",monospace';
+  ctx.textAlign = align || 'center';
+  ctx.fillStyle = col;
+  ctx.fillText(txt, x, y);
 }
-reset();
+function pts(txt, x, y, sz, col, sh) {
+  ctx.font = sz + 'px "Press Start 2P",monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = sh || '#000';
+  ctx.fillText(txt, x+2, y+2);
+  ctx.fillStyle = col;
+  ctx.fillText(txt, x, y);
+}
 
-// ── Draw: Background ─
-const C = AGENT_CONFIG.colors;
-
+// ── Sky Draw: ───────────────────────────────
 function drawSky() {
-  const grad = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
-  grad.addColorStop(0,   C.skyTop);
-  grad.addColorStop(0.5, C.skyMid);
-  grad.addColorStop(1,   C.skyBot);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, BASE_W, GROUND_Y);
-}
-
-function drawStars() {
-  for (const s of stars) {
-    const alpha = 0.5 + 0.5 * Math.sin(s.blink + frame * 0.03);
-    ctx.fillStyle = `rgba(180,210,255,${alpha.toFixed(2)})`;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-    ctx.fill();
+  ctx.fillStyle = '#0d0d1a';
+  ctx.fillRect(0, 0, W, GYL);
+  // pixel grid bg
+  ctx.fillStyle = '#12122a';
+  for (let x = 0; x < W; x += 16) ctx.fillRect(x, 0, 1, GYL);
+  for (let y = 0; y < GYL; y += 16) ctx.fillRect(0, y, W, 1);
+  // stars
+  for (const s of STARS) {
+    const on = ((frame >> 3) + s.b) % 8 < 4;
+    ctx.fillStyle = on ? '#ffffff' : '#333355';
+    ctx.fillRect(s.x, s.y, 2, 2);
   }
 }
 
-function drawBgRacks() {
-  const racks = [[20,200,30,100],[60,220,25,80],[110,180,40,120],
-                 [170,210,28,90],[210,195,35,115],[255,215,22,85]];
-  for (const [x, y, w, h] of racks) {
-    ctx.fillStyle = C.bgRack;
-    ctx.fillRect(x, y, w, h);
-    for (let r = 0; r < 4; r++) {
-      const on = Math.sin(frame * 0.05 + x * 0.1 + r) > 0;
-      ctx.fillStyle = on ? 'rgba(0,255,100,0.8)' : 'rgba(0,255,100,0.15)';
-      ctx.beginPath();
-      ctx.arc(x + 5 + (r % 2) * 8, y + 8 + Math.floor(r / 2) * 8, 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-}
-
-// ── Draw: Ground ─────────────────────────────────────────────────
-function drawGround(offset) {
-  ctx.fillStyle = C.ground;
-  ctx.fillRect(0, GROUND_Y, BASE_W, GROUND_H);
-  ctx.fillStyle = C.groundLine;
-  ctx.fillRect(0, GROUND_Y, BASE_W, 3);
-
-  ctx.font = '9px monospace';
-  ctx.fillStyle = C.groundText;
-  const prompts = AGENT_CONFIG.groundPrompts;
-  for (let i = 0; i < 6; i++) {
-    const x = ((i * 58 - offset * 0.5) % (BASE_W + 60)) - 10;
-    ctx.fillText(prompts[i % prompts.length], x, GROUND_Y + 18);
-  }
-
-  for (let y = GROUND_Y + 22; y < BASE_H; y += 4) {
-    ctx.fillStyle = 'rgba(0,0,0,0.2)';
-    ctx.fillRect(0, y, BASE_W, 2);
-  }
-}
-
-// ── Draw: Pipes ──────────────────────────────────────────────────
-function drawPipe(x, topH, botY) {
-  const CAP = 24, EX = 5;
-  ctx.shadowColor = C.accent;
-  ctx.shadowBlur = 6;
-
-  // Top body
-  ctx.fillStyle = '#1a3a1a';
-  ctx.fillRect(x + 2, 0, PIPE_W - 4, topH - CAP);
-  ctx.fillStyle = '#2a5a2a';
-  ctx.fillRect(x + 2, 0, 8, topH - CAP);
-  ctx.fillStyle = '#0a1a0a';
-  ctx.fillRect(x + PIPE_W - 10, 0, 8, topH - CAP);
-
-  for (let py = 10; py < topH - CAP; py += 20) {
-    ctx.fillStyle = Math.sin(frame * 0.08 + py * 0.1) > 0.3
-      ? 'rgba(0,255,80,0.9)' : 'rgba(0,100,40,0.4)';
-    ctx.fillRect(x + PIPE_W - 7, py, 4, 6);
-  }
-
-  ctx.fillStyle = '#2d6b2d';
-  ctx.fillRect(x - EX, topH - CAP, PIPE_W + EX * 2, CAP);
-  ctx.fillStyle = '#1a3a1a';
-  ctx.fillRect(x - EX, topH - CAP + CAP - 4, PIPE_W + EX * 2, 4);
-  ctx.strokeStyle = C.accent;
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x - EX, topH - CAP, PIPE_W + EX * 2, CAP);
-
-  // Bottom body
-  ctx.fillStyle = '#1a3a1a';
-  ctx.fillRect(x + 2, botY + CAP, PIPE_W - 4, GROUND_Y - botY - CAP);
-  ctx.fillStyle = '#2a5a2a';
-  ctx.fillRect(x + 2, botY + CAP, 8, GROUND_Y - botY - CAP);
-  ctx.fillStyle = '#0a1a0a';
-  ctx.fillRect(x + PIPE_W - 10, botY + CAP, 8, GROUND_Y - botY - CAP);
-
-  for (let py = botY + CAP + 10; py < GROUND_Y; py += 20) {
-    ctx.fillStyle = Math.sin(frame * 0.08 + py * 0.1 + 3) > 0.3
-      ? 'rgba(0,255,80,0.9)' : 'rgba(0,100,40,0.4)';
-    ctx.fillRect(x + PIPE_W - 7, py, 4, 6);
-  }
-
-  ctx.fillStyle = '#2d6b2d';
-  ctx.fillRect(x - EX, botY, PIPE_W + EX * 2, CAP);
-  ctx.fillStyle = '#1a3a1a';
-  ctx.fillRect(x - EX, botY, PIPE_W + EX * 2, 4);
-  ctx.strokeStyle = C.accent;
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x - EX, botY, PIPE_W + EX * 2, CAP);
-
-  ctx.shadowBlur = 0;
-}
-
-// ── Draw: Score ──────────────────────────────────────────────────
-function drawScore(s) {
-  const pop = 1 + scorePop * 0.3;
-  ctx.save();
-  ctx.translate(BASE_W / 2, 55);
-  ctx.scale(pop, pop);
-  ctx.textAlign = 'center';
-  ctx.font = 'bold 28px monospace';
-  ctx.fillStyle = C.score;
-  ctx.shadowColor = C.score;
-  ctx.shadowBlur = 10 + scorePop * 8;
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 4;
-  ctx.strokeText(s, 0, 0);
-  ctx.fillText(s, 0, 0);
-  ctx.shadowBlur = 0;
-  ctx.restore();
-}
-
-// ── Draw: Screen Idle ─────
-// Tutorial button hit area (in BASE coords)
-const TUTORIAL_BTN = { x: BASE_W / 2 - 60, y: BASE_H / 2 + 88, w: 120, h: 24 };
-
-function drawIdleScreen() {
-  ctx.textAlign = 'center';
-
-  // Title
-  ctx.font = 'bold 30px monospace';
-  ctx.shadowColor = C.titleGlow;
-  ctx.shadowBlur = 20;
-  ctx.fillStyle = C.title;
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 4;
-  ctx.strokeText(AGENT_CONFIG.title, BASE_W / 2, 108);
-  ctx.fillText(AGENT_CONFIG.title, BASE_W / 2, 108);
-  ctx.shadowBlur = 0;
-
-  // Subtitle
-  ctx.font = '9px monospace';
-  ctx.fillStyle = 'rgba(255,130,80,0.7)';
-  ctx.fillText('a claw agent production', BASE_W / 2, 122);
-
-  // Lore block
-  ctx.font = '9px monospace';
-  ctx.fillStyle = 'rgba(0,255,80,0.6)';
+// ── Draw: Ground ───────────────────────────────────
+function drawGround() {
+  ctx.fillStyle = '#3a2a0a';
+  ctx.fillRect(0, GYL, W, GH);
+  // stripe
+  ctx.fillStyle = '#8B6020';
+  ctx.fillRect(0, GYL, W, 5);
+  ctx.fillStyle = '#c08030';
+  ctx.fillRect(0, GYL+5, W, 5);
+  ctx.fillStyle = '#8B6020';
+  ctx.fillRect(0, GYL+10, W, 2);
+  // scrolling text
+  ctx.font = '6px "Press Start 2P",monospace';
   ctx.textAlign = 'left';
-  AGENT_CONFIG.loreLines.forEach((line, i) => {
-    ctx.fillText(line, 14, BASE_H / 2 - 20 + i * 14);
+  ctx.fillStyle = 'rgba(255,180,40,0.55)';
+  const txt = CFG.groundText;
+  const tw  = ctx.measureText(txt).width;
+  const ox  = W - ((gOff * 0.7) % tw);
+  ctx.fillText(txt, ox - tw, GYL + 24);
+  ctx.fillText(txt, ox,      GYL + 24);
+}
+
+// ── Draw: Pipe ─────────────────────────────────────
+function drawPipe(x, tH, bY) {
+  const EX = 6, CAP = 18;
+  // top body
+  ctx.fillStyle = '#1a5c1a'; ctx.fillRect(x+2, 0, PW-4, tH-CAP);
+  ctx.fillStyle = '#2d8a2d'; ctx.fillRect(x+2, 0, 5,    tH-CAP);
+  ctx.fillStyle = '#0f3a0f'; ctx.fillRect(x+PW-7, 0, 5, tH-CAP);
+  // pixel highlight
+  ctx.fillStyle = '#4aaa4a'; ctx.fillRect(x+3, 0, 2, tH-CAP);
+  // top cap
+  ctx.fillStyle = '#2d8a2d'; ctx.fillRect(x-EX, tH-CAP, PW+EX*2, CAP);
+  ctx.fillStyle = '#4aaa4a'; ctx.fillRect(x-EX, tH-CAP, PW+EX*2, 4);
+  ctx.fillStyle = '#0f3a0f'; ctx.fillRect(x-EX, tH-4,   PW+EX*2, 4);
+  // bot cap
+  ctx.fillStyle = '#2d8a2d'; ctx.fillRect(x-EX, bY, PW+EX*2, CAP);
+  ctx.fillStyle = '#4aaa4a'; ctx.fillRect(x-EX, bY, PW+EX*2, 4);
+  ctx.fillStyle = '#0f3a0f'; ctx.fillRect(x-EX, bY+CAP-4, PW+EX*2, 4);
+  // bot body
+  ctx.fillStyle = '#1a5c1a'; ctx.fillRect(x+2, bY+CAP, PW-4, GYL-bY-CAP);
+  ctx.fillStyle = '#2d8a2d'; ctx.fillRect(x+2, bY+CAP, 5,    GYL-bY-CAP);
+  ctx.fillStyle = '#0f3a0f'; ctx.fillRect(x+PW-7, bY+CAP, 5, GYL-bY-CAP);
+  ctx.fillStyle = '#4aaa4a'; ctx.fillRect(x+3, bY+CAP, 2,    GYL-bY-CAP);
+}
+
+// ── Draw: HUD ──────────────────────────────────────
+function drawHUD() {
+  // Score
+  pts('' + score, W/2, 38, 16, '#ffffff', '#00000088');
+  // Lives (pixel hearts)
+  for (let i = 0; i < CFG.lives; i++) {
+    const hx = 8 + i * 16, hy = 6;
+    ctx.fillStyle = i < lives ? '#ff4444' : '#3a1a1a';
+    [[0,1,0,1,0],[1,1,1,1,1],[0,1,1,1,0],[0,0,1,0,0]].forEach((row,r) =>
+      row.forEach((p,c) => p && ctx.fillRect(hx+c*3, hy+r*3, 3, 3))
+    );
+  }
+  // Level badge
+  if (level > 1) {
+    ctx.fillStyle = '#ffdd44';
+    ctx.font = '6px "Press Start 2P",monospace';
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#000';
+    ctx.fillText('LV'+level, W-5, 17);
+    ctx.fillStyle = '#ffdd44';
+    ctx.fillText('LV'+level, W-7, 15);
+  }
+  // Level flash
+  if (lvlFlash > 0) {
+    ctx.globalAlpha = Math.min(1, lvlFlash / 30);
+    pts('LEVEL ' + level + '!', W/2, H/2 - 20, 12, '#ffdd44');
+    ctx.globalAlpha = 1;
+    lvlFlash--;
+  }
+  // Combo
+  if (comboT > 0 && comboN >= 3) {
+    ctx.globalAlpha = Math.min(1, comboT / 20);
+    pts('x' + comboN + ' COMBO', W/2, 65, 7, '#ffaa00');
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ── Draw: Title ────────────────────────────────────
+function drawTitle() {
+  // title box
+  ctx.fillStyle = '#000000aa';
+  ctx.fillRect(W/2-90, 72, 180, 64);
+  ctx.fillStyle = CFG.colors.accent;
+  ctx.fillRect(W/2-90, 72,  180, 4);
+  ctx.fillRect(W/2-90, 132, 180, 4);
+  ctx.fillRect(W/2-90, 72,  4,   64);
+  ctx.fillRect(W/2+86, 72,  4,   64);
+  pts('FLAPPY', W/2, 98,  14, '#ff8040', '#400000');
+  pts('CLAW',   W/2, 124, 14, '#ff4040', '#400000');
+
+  // lore
+  CFG.lore.forEach((l, i) => {
+    pt(l, W/2, 162 + i*14, 5, 'rgba(0,255,136,0.85)');
   });
-  ctx.textAlign = 'center';
 
-  // Start prompt (pulsing)
-  const pulse = Math.sin(frame * 0.1) * 0.4 + 0.6;
-  ctx.globalAlpha = pulse;
-  ctx.font = 'bold 14px monospace';
-  ctx.fillStyle = C.score;
-  ctx.shadowColor = C.score;
-  ctx.shadowBlur = 8;
-  ctx.fillText(AGENT_CONFIG.startPrompt, BASE_W / 2, BASE_H / 2 + 62);
-  ctx.shadowBlur = 0;
+  // tap to start
+  const p = (Math.sin(frame * 0.09) + 1) / 2;
+  ctx.globalAlpha = 0.45 + p * 0.55;
+  pts('TAP TO START', W/2, H/2 + 60, 8, CFG.colors.accent);
   ctx.globalAlpha = 1;
 
-  if (highScore > 0) {
-    ctx.font = '10px monospace';
-    ctx.fillStyle = 'rgba(255,200,100,0.8)';
-    ctx.fillText(`BEST: ${highScore} ${AGENT_CONFIG.scoreLabel}`, BASE_W / 2, BASE_H / 2 + 78);
-  }
+  if (hiScore > 0) pt('BEST ' + hiScore, W/2, H/2 + 84, 6, '#ffdd44');
 
-  // How to play button
-  const b = TUTORIAL_BTN;
-  const hoverPulse = 0.85 + Math.sin(frame * 0.07) * 0.15;
-  ctx.globalAlpha = hoverPulse;
-  ctx.strokeStyle = 'rgba(0,255,130,0.5)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.roundRect(b.x, b.y, b.w, b.h, 4);
-  ctx.stroke();
-  ctx.font = '10px monospace';
-  ctx.fillStyle = 'rgba(0,255,130,0.7)';
-  ctx.fillText('[ ? HOW TO PLAY ]', BASE_W / 2, b.y + 16);
-  ctx.globalAlpha = 1;
+  // controls hint
+  pt('SPACE / TAP = FLAP', W/2, H - GH - 18, 5, 'rgba(255,255,255,0.4)');
 }
 
-function drawTutorialScreen() {
-  // Overlay
-  ctx.fillStyle = 'rgba(0,0,0,0.75)';
-  ctx.fillRect(0, 0, BASE_W, BASE_H);
-
-  const px = BASE_W / 2 - 100, py = 80, pw = 200, ph = 320;
-
-  // Panel
-  ctx.fillStyle = '#08130d';
-  ctx.strokeStyle = C.accent;
-  ctx.lineWidth = 2;
-  ctx.shadowColor = C.accent;
-  ctx.shadowBlur = 12;
-  ctx.beginPath();
-  ctx.roundRect(px, py, pw, ph, 8);
-  ctx.fill();
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-
-  // Header
-  ctx.textAlign = 'center';
-  ctx.font = 'bold 13px monospace';
-  ctx.fillStyle = C.title;
-  ctx.fillText('// HOW TO PLAY', BASE_W / 2, py + 22);
-
-  ctx.strokeStyle = C.accentDim;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(px + 12, py + 30);
-  ctx.lineTo(px + pw - 12, py + 30);
-  ctx.stroke();
-
-  // Instructions
-  const lines = [
-    ['CONTROLS', null],
-    ['TAP / SPACE', 'flap'],
-    ['↑ ARROW', 'flap'],
-    ['', null],
-    ['OBJECTIVE', null],
-    ['Dodge the server', null],
-    ['conduits. Each', null],
-    ['gap = +1 ' + AGENT_CONFIG.scoreLabel, null],
-    ['', null],
-    ['RANKS', null],
-    ...AGENT_CONFIG.ranks.slice(0,4).map(([min, label, col]) =>
-      [`[${label}] ≥ ${min}`, col]
-    ),
-    ['', null],
-    ['High score saved', null],
-    ['automatically.', null],
-  ];
-
-  ctx.font = '9px monospace';
-  let ly = py + 46;
-  for (const [text, col] of lines) {
-    if (!text) { ly += 5; continue; }
-    if (!col && text === text.toUpperCase() && text.length > 2) {
-      // Section header
-      ctx.fillStyle = 'rgba(0,255,130,0.8)';
-      ctx.font = 'bold 9px monospace';
-    } else if (col) {
-      ctx.fillStyle = col;
-      ctx.font = '9px monospace';
-    } else {
-      ctx.fillStyle = 'rgba(180,220,180,0.8)';
-      ctx.font = '9px monospace';
-    }
-    ctx.fillText(text, BASE_W / 2, ly);
-    ly += 14;
+// ── Draw: Dying overlay ────────────────────────────
+function drawDying() {
+  ctx.fillStyle = 'rgba(255,40,40,0.18)';
+  ctx.fillRect(0, 0, W, GYL);
+  const prog = 1 - (dTimer / 80);
+  if (prog > 0.3) {
+    ctx.globalAlpha = Math.min(1, (prog - 0.3) / 0.4);
+    pts('LIFE LOST!', W/2, H/2 - 10, 10, '#ff4444');
+    // remaining lives
+    pt(lives + ' LEFT', W/2, H/2 + 14, 8, '#ffaa44');
+    ctx.globalAlpha = 1;
   }
-
-  // Dismiss
-  const pulse = Math.sin(frame * 0.1) * 0.4 + 0.6;
-  ctx.globalAlpha = pulse;
-  ctx.font = 'bold 11px monospace';
-  ctx.fillStyle = C.score;
-  ctx.shadowColor = C.score;
-  ctx.shadowBlur = 6;
-  ctx.fillText('[ TAP TO CLOSE ]', BASE_W / 2, py + ph - 14);
-  ctx.shadowBlur = 0;
-  ctx.globalAlpha = 1;
 }
 
-// ── Draw: Death Screen ───────────────────────────────────────────
-function drawDeadScreen() {
-  ctx.fillStyle = 'rgba(0,0,0,0.55)';
-  ctx.fillRect(0, 0, BASE_W, BASE_H);
+// ── Draw: Over Game ───────────────
+function drawGameOver() {
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  ctx.fillRect(0, 0, W, H);
 
-  const PW = 188, PH = 200;
-  const px = BASE_W / 2 - PW / 2;
-  const py = BASE_H / 2 - PH / 2 - 10;
+  const PNW = 208, PNH = 196;
+  const px = W/2-PNW/2, py = H/2-PNH/2-8;
 
-  // Panel
-  ctx.fillStyle = C.panelBg;
-  ctx.strokeStyle = C.accent;
-  ctx.lineWidth = 2;
-  ctx.shadowColor = C.accent;
-  ctx.shadowBlur = 12;
-  ctx.beginPath();
-  ctx.roundRect(px, py, PW, PH, 8);
-  ctx.fill();
-  ctx.stroke();
-  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#081408';
+  ctx.fillRect(px, py, PNW, PNH);
+  // chunky pixel border
+  const bc = CFG.colors.accent;
+  ctx.fillStyle = bc; ctx.fillRect(px,       py,       PNW, 4);
+  ctx.fillStyle = bc; ctx.fillRect(px,       py+PNH-4, PNW, 4);
+  ctx.fillStyle = bc; ctx.fillRect(px,       py,       4,   PNH);
+  ctx.fillStyle = bc; ctx.fillRect(px+PNW-4, py,       4,   PNH);
+  // corner pixels (NES style)
+  ctx.fillStyle = '#000'; ctx.fillRect(px,       py,       4, 4);
+  ctx.fillStyle = '#000'; ctx.fillRect(px+PNW-4, py,       4, 4);
+  ctx.fillStyle = '#000'; ctx.fillRect(px,       py+PNH-4, 4, 4);
+  ctx.fillStyle = '#000'; ctx.fillRect(px+PNW-4, py+PNH-4, 4, 4);
 
-  // Death title
-  ctx.textAlign = 'center';
-  ctx.font = 'bold 15px monospace';
-  ctx.fillStyle = C.deathRed;
-  ctx.shadowColor = C.deathRed;
-  ctx.shadowBlur = 6;
-  ctx.fillText(AGENT_CONFIG.deathTitle, BASE_W / 2, py + 26);
-  ctx.shadowBlur = 0;
+  pts('GAME OVER', W/2, py+26, 11, '#ff4444', '#220000');
 
-  // Death subtitle
-  ctx.font = '9px monospace';
-  ctx.fillStyle = 'rgba(255,80,80,0.6)';
-  ctx.fillText(AGENT_CONFIG.deathSubtitle, BASE_W / 2, py + 42);
+  // divider
+  ctx.fillStyle = bc + '50'; ctx.fillRect(px+10, py+36, PNW-20, 2);
 
-  // Divider
-  ctx.strokeStyle = C.accentDim;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(px + 12, py + 52);
-  ctx.lineTo(px + PW - 12, py + 52);
-  ctx.stroke();
+  pt('SCORE', W/2-44, py+52, 5, '#888');
+  pt('BEST',  W/2+44, py+52, 5, '#888');
+  pts('' + score,   W/2-44, py+76, 13, '#00ff88');
+  pts('' + hiScore, W/2+44, py+76, 13, '#ffdd44');
 
-  // Score columns
-  const lx = BASE_W / 2 - 44, rx = BASE_W / 2 + 44;
-  ctx.font = '9px monospace';
-  ctx.fillStyle = '#666';
-  ctx.fillText(AGENT_CONFIG.scoreLabel.toUpperCase(), lx, py + 68);
-  ctx.fillText('BEST', rx, py + 68);
+  ctx.fillStyle = bc + '50'; ctx.fillRect(px+10, py+90, PNW-20, 2);
 
-  ctx.font = 'bold 26px monospace';
-  ctx.fillStyle = C.score;
-  ctx.shadowColor = C.score;
-  ctx.shadowBlur = 8;
-  ctx.fillText(score, lx, py + 100);
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = C.bestGold;
-  ctx.fillText(highScore, rx, py + 100);
+  // rank
+  const RANKS = [[40,'S','#ff8040'],[25,'A','#ffd700'],[10,'B','#c0c0c0'],[3,'C','#cd7f32'],[0,'D','#666']];
+  const [,rk,rc] = RANKS.find(([m]) => score >= m);
+  pts('[' + rk + ']', W/2, py+124, 13, rc);
 
-  // Rank badge
-  const [, rank, rankCol] = AGENT_CONFIG.ranks.find(([min]) => score >= min);
-  ctx.font = 'bold 16px monospace';
-  ctx.fillStyle = rankCol;
-  ctx.shadowColor = rankCol;
-  ctx.shadowBlur = 8;
-  ctx.fillText('[' + rank + ']', BASE_W / 2, py + 126);
-  ctx.shadowBlur = 0;
-
-  // Divider 2
-  ctx.strokeStyle = C.accentDim;
-  ctx.beginPath();
-  ctx.moveTo(px + 12, py + 138);
-  ctx.lineTo(px + PW - 12, py + 138);
-  ctx.stroke();
-
-  // New best indicator
-  if (score > 0 && score === highScore) {
-    ctx.font = 'bold 9px monospace';
-    ctx.fillStyle = C.bestGold;
-    ctx.shadowColor = C.bestGold;
-    ctx.shadowBlur = 6;
-    ctx.fillText('✦ NEW BEST ✦', BASE_W / 2, py + 154);
-    ctx.shadowBlur = 0;
+  // new best
+  if (score > 0 && score >= hiScore) {
+    pts('NEW BEST!', W/2, py+148, 7, '#ffdd44', '#442200');
   }
 
-  // Restart prompt — only show after lockout
-  if (frame - deathFrame >= 60) {
-    const pulse = Math.sin(frame * 0.1) * 0.4 + 0.6;
-    ctx.globalAlpha = pulse;
-    ctx.font = 'bold 11px monospace';
-    ctx.fillStyle = C.score;
-    ctx.shadowColor = C.score;
-    ctx.shadowBlur = 6;
-    ctx.fillText(AGENT_CONFIG.restartPrompt, BASE_W / 2, py + PH - 14);
-    ctx.shadowBlur = 0;
+  // tap to retry (gated)
+  if (dTimer <= 0) {
+    const p = (Math.sin(frame * 0.1) + 1) / 2;
+    ctx.globalAlpha = 0.4 + p * 0.6;
+    pts('TAP TO RETRY', W/2, py+PNH-14, 7, CFG.colors.accent);
     ctx.globalAlpha = 1;
   } else {
-    // Show a brief "..." while locked
-    const dots = '.'.repeat(1 + Math.floor((frame - deathFrame) / 20) % 3);
-    ctx.font = '11px monospace';
-    ctx.fillStyle = 'rgba(100,100,100,0.6)';
-    ctx.fillText(dots, BASE_W / 2, py + PH - 14);
+    // loading dots
+    const d = '.'.repeat(1 + Math.floor((90-dTimer)/30) % 3);
+    pt(d, W/2, py+PNH-14, 10, '#444');
   }
 }
 
-// ── Particles ────────────────────────────────────────────────────
-function spawnParticles(x, y) {
-  const cols = AGENT_CONFIG.particleColors;
-  for (let i = 0; i < 14; i++) {
-    particles.push({
-      x, y,
-      vx: (Math.random() - 0.5) * 5,
-      vy: (Math.random() - 0.5) * 5,
-      life: 1,
-      col: cols[Math.floor(Math.random() * cols.length)],
-    });
+// ── Particles ──────────────────────────────────────
+function burst(x, y) {
+  const cols = ['#ff4040','#ff8040','#ffcc40','#ff4088','#ffffff'];
+  for (let i = 0; i < 12; i++) {
+    const a = (i/12)*Math.PI*2 + Math.random()*0.3;
+    const spd = 2 + Math.random() * 3;
+    particles.push({x, y, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd-1,
+      life:1, col:cols[i%cols.length]});
   }
 }
-
-function updateParticles() {
+function drawParticles() {
   particles = particles.filter(p => p.life > 0);
   for (const p of particles) {
-    p.x += p.vx;
-    p.y += p.vy;
-    p.vy += 0.1;
-    p.life -= 0.035;
+    p.x += p.vx; p.y += p.vy; p.vy += 0.18; p.life -= 0.038;
     ctx.globalAlpha = p.life;
     ctx.fillStyle = p.col;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 3 * p.life, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
+    ctx.fillRect(p.x|0, p.y|0, 4, 4);
   }
+  ctx.globalAlpha = 1;
 }
 
-// ── Mechanics ───────────────────────
-function spawnPipe() {
-  const minTop = 70, maxTop = GROUND_Y - PIPE_GAP - 70;
-  pipes.push({ x: BASE_W + PIPE_W, topH: minTop + Math.random() * (maxTop - minTop), scored: false });
-}
-
-function checkCollision() {
-  const bx = BIRD_X, by = bird.y, r = BIRD_R - 3;
-  if (by + r >= GROUND_Y || by - r <= 0) return true;
+// ── Collision ──────────────────────────────────────
+function hits() {
+  const R = 8;
+  if (bird.y + R >= GYL || bird.y - R <= 0) return true;
   for (const p of pipes) {
-    const botY = p.topH + PIPE_GAP;
-    if (bx + r > p.x - 6 && bx - r < p.x + PIPE_W + 6) {
-      if (by - r < p.topH || by + r > botY) return true;
+    if (BX+R > p.x-3 && BX-R < p.x+PW+3) {
+      if (bird.y-R < p.topH || bird.y+R > p.topH+PG) return true;
     }
   }
   return false;
 }
 
-function flap() {
-  if (state === 'tutorial') { state = 'idle'; return; }
-  if (state === 'idle') { state = 'playing'; bird.vy = FLAP_V; return; }
-  if (state === 'dead') {
-    // Require at least 60 frames (~1s) on death screen before restart
-    if (frame - deathFrame < 60) return;
-    reset(); state = 'playing'; bird.vy = FLAP_V; return;
+// ── Input ──────────────────────────────────────────
+let lastTap = 0;
+function tap() {
+  const now = Date.now();
+  if (now - lastTap < 100) return; // debounce: ignore within 100ms
+  lastTap = now;
+  if (state === 'title') {
+    state = 'playing'; bird.vy = FLAPV;
+  } else if (state === 'playing') {
+    bird.vy = FLAPV; bird.t = 0;
+  } else if (state === 'dying') {
+    // no input during dying
+  } else if (state === 'gameover') {
+    if (dTimer > 0) return;
+    newGame(); state = 'playing'; bird.vy = FLAPV;
   }
-  if (state === 'playing') { bird.vy = FLAP_V; bird.flapFrame = 0; }
-}
-
-function handlePointer(e) {
-  e.preventDefault();
-  // Use first touch point or mouse position
-  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-  if (state === 'idle') {
-    // Check if tapped the HOW TO PLAY button
-    const rect = canvas.getBoundingClientRect();
-    const cx = (clientX - rect.left) / scale;
-    const cy = (clientY - rect.top) / scale;
-    const b = TUTORIAL_BTN;
-    if (cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h) {
-      state = 'tutorial';
-      return;
-    }
-  }
-  flap();
 }
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); flap(); }
-  if (e.code === 'KeyH' && state === 'idle') { state = 'tutorial'; }
+  if (['Space','ArrowUp','KeyW'].includes(e.code)) { e.preventDefault(); tap(); }
 });
-// Use touchstart only (pointerdown fires after touchstart on iOS, causing double-flap)
-canvas.addEventListener('touchstart', handlePointer, { passive: false });
-// Fallback for non-touch devices (desktop mouse)
-canvas.addEventListener('pointerdown', e => {
-  if (e.pointerType !== 'touch') handlePointer(e);
-});
+canvas.addEventListener('touchstart', e => { e.preventDefault(); tap(); }, { passive: false });
+canvas.addEventListener('mousedown',  e => { if (e.button === 0) tap(); });
 
-// ── Loop Main ─
+// ── Loop ───────────────────────────────────────────
 function loop() {
   frame++;
-  groundOffset = (groundOffset + (state === 'playing' ? PIPE_SPEED : 0)) % 24;
+  const spd = 1.8 + (level-1) * 0.12;
 
   if (state === 'playing') {
-    if (frame % PIPE_INTERVAL === 0) spawnPipe();
-
-    bird.vy += GRAVITY;
-    bird.y  += bird.vy;
-    bird.flapFrame++;
-    bird.angle = Math.min(Math.PI / 3, Math.max(-Math.PI / 6, bird.vy * 0.08));
+    gOff += spd;
+    if (frame % PINT === 0) {
+      const mn = 55, mx = GYL - PG - 55;
+      pipes.push({ x: W+PW, topH: mn + Math.random()*(mx-mn), scored: false });
+    }
+    bird.vy += GRAV; bird.y += bird.vy; bird.t++;
+    bird.angle = Math.min(Math.PI/3, Math.max(-Math.PI/5, bird.vy * 0.09));
 
     for (const p of pipes) {
-      p.x -= PIPE_SPEED;
-      if (!p.scored && p.x + PIPE_W < BIRD_X) {
-        p.scored = true;
-        score++;
-        scorePop = 1;
-        if (score > highScore) {
-          highScore = score;
-          localStorage.setItem(AGENT_CONFIG.highScoreKey, highScore);
-        }
+      p.x -= spd;
+      if (!p.scored && p.x+PW < BX) {
+        p.scored = true; score++; lvlPts++; comboN++; comboT = 55;
+        if (score > hiScore) hiScore = score;
+        if (lvlPts >= 10) { level++; lvlPts = 0; lvlFlash = 80; }
       }
     }
-    pipes = pipes.filter(p => p.x > -PIPE_W - 30);
+    pipes = pipes.filter(p => p.x > -PW-10);
+    comboT = Math.max(0, comboT-1);
 
-    if (checkCollision()) {
-      state = 'dead';
-      deathFrame = frame;
-      spawnParticles(BIRD_X, bird.y);
+    if (hits()) {
+      burst(BX, bird.y); lives--; dTimer = 80;
+      state = lives > 0 ? 'dying' : 'gameover';
     }
+
+  } else if (state === 'dying') {
+    dTimer--;
+    gOff += 0.4;
+    bird.vy += GRAV; bird.y = Math.min(bird.y + bird.vy, GYL - 10);
+    if (dTimer <= 0) { respawn(); state = 'playing'; }
+
+  } else if (state === 'gameover') {
+    dTimer = Math.max(0, dTimer-1);
+    gOff += 0.2;
+    bird.y = Math.min(bird.y + 2, GYL - 10);
+
+  } else if (state === 'title') {
+    gOff += 0.5;
+    bird.y = H/2 - 30 + Math.sin(frame * 0.05) * 8;
   }
 
-  scorePop = Math.max(0, scorePop - 0.08);
-
-  // Smooth shake decay
-  const age = frame - deathFrame;
-  const shakeAmt = state === 'dead' ? Math.max(0, 8 - age * 0.6) : 0;
-  shakeX = (Math.random() - 0.5) * shakeAmt;
-  shakeY = (Math.random() - 0.5) * shakeAmt;
-
-  // ── Render ──────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────
   drawSky();
-  drawStars();
-  drawBgRacks();
+  for (const p of pipes) drawPipe(p.x, p.topH, p.topH+PG);
+  drawGround();
+  drawParticles();
 
-  for (const p of pipes) drawPipe(p.x, p.topH, p.topH + PIPE_GAP);
-  drawGround(groundOffset);
-
-  // Draw player (with shake on death)
   ctx.save();
-  ctx.translate(BIRD_X + shakeX, bird.y + shakeY);
-  ctx.rotate(state === 'dead' ? Math.PI / 2 : bird.angle);
-  AGENT_CONFIG.drawPlayer(ctx, bird.flapFrame, state === 'dead');
+  ctx.translate(BX, bird.y|0);
+  ctx.rotate(state==='gameover' ? Math.PI/2 : bird.angle);
+  CFG.drawPlayer(ctx, bird.t, state==='gameover');
   ctx.restore();
 
-  updateParticles();
+  if (state === 'playing')  { drawHUD(); }
+  if (state === 'dying')    { drawHUD(); drawDying(); }
+  if (state === 'gameover') { drawHUD(); drawGameOver(); }
+  if (state === 'title')    { drawHUD(); drawTitle(); }
 
-  if (state === 'playing') drawScore(score);
-  if (state === 'idle')    { drawScore(0); drawIdleScreen(); }
-  if (state === 'tutorial'){ drawScore(0); drawIdleScreen(); drawTutorialScreen(); }
-  if (state === 'dead')    { drawScore(score); drawDeadScreen(); }
+  // CRT scanlines
+  ctx.fillStyle = 'rgba(0,0,0,0.06)';
+  for (let y = 0; y < H; y += 3) ctx.fillRect(0, y, W, 1);
 
   requestAnimationFrame(loop);
 }
 
-requestAnimationFrame(loop);
+// Wait for Press Start 2P to load
+document.fonts.ready.then(() => requestAnimationFrame(loop));
 </script>
 </body>
 </html>

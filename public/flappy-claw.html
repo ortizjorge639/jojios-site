@@ -147,7 +147,7 @@ let pitCards=[], pitPicked=false, pitTransTimer=0, lastPitScore=-1;
 let pitCountTimer=0; // countdown before entering pitstop
 const PIT_INTERVAL=25;
 const PIT_TRANS_FRAMES=22;
-const PIT_COUNT_FRAMES=90; // ~1.5s countdown (3-2-1 GO)
+const PIT_COUNT_FRAMES=150; // ~2.5s countdown (3-2-1 GO) — after card pick
 
 // gameover
 let goXpBefore=0, goXpGain=0, goNewLevel=false, goNewSkins=[], goRunBits=0, goCanInput=false, goTimer=0;
@@ -619,11 +619,15 @@ function tickPlaying() {
   comboT=Math.max(0,comboT-1);
   if(comboN>P.bestCombo) P.bestCombo=comboN;
 
-  // pit stop countdown: freeze world and count down before card screen
-  if(score>0 && score%PIT_INTERVAL===0 && score!==lastPitScore && pitCountTimer===0) {
+  // pit stop — show card selection first, countdown after
+  if(score>0 && score%PIT_INTERVAL===0 && score!==lastPitScore) {
     lastPitScore=score;
-    pitCountTimer=PIT_COUNT_FRAMES;
-    state='pitcountdown';
+    // respawn bird to safe center position, clear incoming pipes
+    bird = { y:H/2-30, vy:0, angle:0, t:0 };
+    pipes = pipes.filter(p=>p.scored);
+    pitCards=pickCards(); pitTransTimer=PIT_TRANS_FRAMES;
+    state='pitstop'; pitPicked=false;
+    sfxPitOpen();
     return;
   }
 
@@ -665,23 +669,20 @@ function drawPlaying() {
 // ── PIT COUNTDOWN ──────────────────────────────────
 function tickPitCountdown() {
   pitCountTimer--;
-  // bird still hovers — gentle bob, no gravity
-  bird.y = H/2-30 + Math.sin(frame*0.05)*6;
+  // bird hovers gently — no gravity, no pipes
+  bird.y = H/2-30 + Math.sin(frame*0.04)*8;
   bird.angle=0;
   bird.t++;
   gOff+=0.3;
 
   const n = Math.ceil(pitCountTimer / (PIT_COUNT_FRAMES/3)); // 3→1
   const prev = Math.ceil((pitCountTimer+1) / (PIT_COUNT_FRAMES/3));
-  if(n !== prev) sfxCountdown(n); // tick on each number change
+  if(n !== prev) sfxCountdown(n);
 
   if(pitCountTimer<=0) {
-    // respawn bird to center, clear oncoming pipes, enter pitstop
-    bird = { y:H/2-30, vy:0, angle:0, t:0 };
-    pipes = pipes.filter(p=>p.scored); // keep only scored pipes (off-screen)
-    pitCards=pickCards(); pitTransTimer=PIT_TRANS_FRAMES;
-    state='pitstop'; pitPicked=false;
-    sfxPitOpen();
+    // done — launch back into playing
+    bird = { y:H/2-30, vy:-1.5, angle:0, t:0 };
+    state='playing'; pitPicked=true;
   }
 }
 
@@ -798,9 +799,9 @@ function drawPitStop() {
   }
   if(!picked&&hitBtn('pitskip')) picked=true;
   if(picked) {
-    // give bird a gentle nudge upward and let them tap to fly
-    bird = { y:H/2-30, vy:-1.5, angle:0, t:0 };
-    state='playing'; pitPicked=true;
+    // card picked → start countdown before resuming
+    pitCountTimer=PIT_COUNT_FRAMES;
+    state='pitcountdown';
   }
   tapPos=null;
 }

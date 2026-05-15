@@ -1,0 +1,9 @@
+{
+  "id": "FC-010",
+  "title": "Cursed Mode — Voluntary difficulty for bonus shards",
+  "description": "Optional pre-run curse toggle accessible from run start screen. 3 curses: NO MERCY (no respawns — die once = game over), THIN PIPES (gap −25%), SPEED DEMON (always 1.4× speed). Each active curse adds +50% shard yield at run end. UI: small skull toggles on omen reveal screen. Cannot toggle mid-run. This is the Hades Heat equivalent — demonstrates mastery, rewards skilled players with faster meta-progression. Keep disabled by default.",
+  "priority": "P3",
+  "status": "todo",
+  "estimate": "M",
+  "tags": ["mechanic", "difficulty", "meta-progression"]
+}

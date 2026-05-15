@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Flappy Claw v2</title>
+  <title>Flappy Claw</title>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -33,8 +33,6 @@ function mkSave() {
     upgrades:      s.upgrades      ?? { extraLife:0, wideGap:0, flapBoost:0, xpBoost:0 },
     totalRuns:     s.totalRuns     ?? 0,
     bestCombo:     s.bestCombo     ?? 0,
-    static:        s.static        ?? 0,
-    traits:        s.traits        ?? {},
   };
 }
 function persist(P) { localStorage.setItem(SAVE_KEY, JSON.stringify(P)); }
@@ -52,57 +50,21 @@ const SKIN_ORDER = ['default','ice','lava','neon','gold','dark'];
 
 // ── pool Card ───────
 const CARDS = [
-  { id:'ghost',      name:'PHASE RUSH',    desc:'Clip thru/2 pipes',     col:'#a0a0ff', icon:'👻' },
-  { id:'shield',     name:'CRASH GUARD',   desc:'Block next/3 hits',      col:'#4080ff', icon:'🛡' },
-  { id:'widegap',    name:'TUNNEL EXPAND', desc:'+40% gap/8 pipes',       col:'#80ff40', icon:'↕' },
-  { id:'doublebits', name:'DOUBLE DIP',    desc:'2× BITS/15 pipes',       col:'#ffd700', icon:'💰' },
-  { id:'slowtime',   name:'LAG SPIKE',     desc:'-45% speed/12 pipes',    col:'#ff80ff', icon:'⏳' },
-  { id:'extralife',  name:'BACKUP CORE',   desc:'+1 life instantly',       col:'#ff4444', icon:'❤️' },
-  { id:'turboflap',  name:'BOOST BURST',   desc:'Flap 35% higher/10p',    col:'#ff8040', icon:'🚀' },
+  { id:'ghost',      name:'GHOST WING',  desc:'Phase thru/2 pipes',   col:'#a0a0ff', icon:'👻' },
+  { id:'shield',     name:'SHIELD',      desc:'Block next/3 hits',     col:'#4080ff', icon:'🛡' },
+  { id:'widegap',    name:'WIDE GAP',    desc:'+40% gap/8 pipes',      col:'#80ff40', icon:'↕' },
+  { id:'doublebits', name:'DOUBLE BITS', desc:'2× BITS/15 pipes',      col:'#ffd700', icon:'💰' },
+  { id:'slowtime',   name:'SLOW TIME',   desc:'-45% speed/12 pipes',   col:'#ff80ff', icon:'⏳' },
+  { id:'extralife',  name:'EXTRA LIFE',  desc:'+1 life instantly',      col:'#ff4444', icon:'❤️' },
+  { id:'turboflap',  name:'TURBO FLAP', desc:'Flap 35% higher/10p',   col:'#ff8040', icon:'⚡' },
 ];
 
 // ── items Shop ──────────────
 const SHOP_ITEMS = [
-  { id:'extraLife',  name:'BACKUP CORE',     desc:'Start with +1 life',   cost:50, max:2 },
-  { id:'wideGap',    name:'CORRIDOR WIDEN',  desc:'Default gap +15%',     cost:40, max:3 },
-  { id:'flapBoost',  name:'WING UPGRADE',    desc:'Jump 15% higher',      cost:30, max:3 },
-  { id:'xpBoost',    name:'SCORE AMPLIFY',   desc:'25% more XP/run',      cost:60, max:2 },
-];
-
-// ── v2: GLITCHES — code exploits Claw carries for the whole run ──
-const GLITCHES = [
-  { id:'coin_press',   name:'PIPELINE TAX',  icon:'🪙', color:'#FFD700', desc:'+2 BITS/pipe cleared',   flavor:'The pipes owe you rent.' },
-  { id:'lucky_wing',   name:'LUCKY CRASH',   icon:'🎲', color:'#00FF88', desc:'1-in-4 pipes pay x3',    flavor:'Every crash is data.' },
-  { id:'iron_feather', name:'DRIFT PHYSICS', icon:'⚙️', color:'#AAAAAA', desc:'Gravity -20%, gap -10%', flavor:'Gravity? Optional.' },
-  { id:'hot_rod',      name:'OVERDRIVE',     icon:'🔥', color:'#FF4400', desc:'Speed +15%, BITS +50%',  flavor:'Fast is a lifestyle.' },
-  { id:'ghost_mantle', name:'PHASE WALK',    icon:'👻', color:'#88AAFF', desc:'Free clip at checkpoints',flavor:'You cannot hit what you become.' },
-  { id:'turbo_heart',  name:'OVERCLOCK',     icon:'💜', color:'#CC44FF', desc:'Flap force +25%',         flavor:'Born to fly.' },
-  { id:'bit_magnet',   name:'STREAK PULL',   icon:'🧲', color:'#00DDFF', desc:'Combo streak builds faster',flavor:'The streak is a cheat code.' },
-  { id:'death_wish',   name:'BINARY EDGE',   icon:'💀', color:'#FF0055', desc:'1 life · BITS x4',        flavor:'Maximum risk. Maximum reward.' },
-  { id:'shield_cloak', name:'AUTO-RESPAWN',  icon:'🛡️', color:'#44FFAA', desc:'Armor rebuilds on respawn',flavor:'Claw does not stay down.' },
-  { id:'echo_lens',    name:'FEEDBACK LOOP', icon:'🔮', color:'#FFAAFF', desc:'Last pick activates again',flavor:'History. On purpose.' },
-];
-
-// ── SIGNALS — the frequency Claw is tuned to this run ──
-const SIGNALS = [
-  { id:'heavy',    name:'SIGNAL: DENSE', icon:'⛈️', color:'#4455AA', effect:'Gravity +35% · Gap wider',        voice:'Heavy air today. But the gaps opened up.' },
-  { id:'golden',   name:'SIGNAL: GOLD',  icon:'✨', color:'#FFD700', effect:'BITS x2 · Gap tighter',            voice:'Pipes are paying out. Squeeze through.' },
-  { id:'fog',      name:'SIGNAL: GHOST', icon:'👁️', color:'#880088', effect:'Pipes flicker in and out',         voice:'Eyes closed. Trust the path.' },
-  { id:'turbo',    name:'SIGNAL: SURGE', icon:'⚡', color:'#00FFCC', effect:'Speed +20% · BITS x1.5',           voice:'No speed limit. No mercy.' },
-  { id:'windfall', name:'SIGNAL: RAIN',  icon:'💰', color:'#FFAA00', effect:'+10 BITS every 10 pipes',          voice:'BITS falling like rain. Catch them.' },
-  { id:'chaos',    name:'SIGNAL: CHAOS', icon:'🌀', color:'#FF00FF', effect:'Gaps randomize wildly',             voice:'The rules changed. You just found out.' },
-  { id:'blessed',  name:'SIGNAL: GRACE', icon:'🌟', color:'#AAAAFF', effect:'Start with 3 armor charges',        voice:'Something is watching out for you.' },
-  { id:'none',     name:'SIGNAL: CLEAN', icon:'🌤️', color:'#44AAFF', effect:'No modifiers · Pure run',          voice:'Clean signal. No excuses.' },
-];
-
-// ── NEURAL — permanent upgrades bought with STATIC in the CLAW LAB ─
-const NEURAL = [
-  { id:'hardened',    name:'BATTLE HARDENED', icon:'❤️',  desc:'Start every run with +1 life',    cost:30, max:1 },
-  { id:'relic_slot',  name:'GLITCH OVERFLOW', icon:'🔌',  desc:'Unlock a 3rd glitch slot',         cost:60, max:1 },
-  { id:'pit_choice',  name:'WIDER OPTIONS',   icon:'📋',  desc:'4 choices at every checkpoint',    cost:40, max:1 },
-  { id:'shard_echo',  name:'STATIC SURGE',    icon:'⚡',  desc:'+30% STATIC earned per crash',     cost:25, max:2 },
-  { id:'combo_armor', name:'STREAK SHIELD',   icon:'🦺',  desc:'Combo 8+ auto-triggers armor',     cost:35, max:1 },
-  { id:'omen_sight',  name:'SIGNAL SCANNER',  icon:'🔭',  desc:'Rescan your signal once per run',  cost:50, max:1 },
+  { id:'extraLife',  name:'EXTRA LIFE', desc:'Start +1 life',      cost:50, max:2 },
+  { id:'wideGap',    name:'WIDE GAP',   desc:'Default gap +15%',   cost:40, max:3 },
+  { id:'flapBoost',  name:'FLAP BOOST', desc:'Jump 15% higher',    cost:30, max:3 },
+  { id:'xpBoost',    name:'XP BOOST',   desc:'25% more XP/run',    cost:60, max:2 },
 ];
 
 // ── Canvas setup ─────────────────────────────────────
@@ -193,87 +155,18 @@ let goXpBefore=0, goXpGain=0, goNewLevel=false, goNewSkins=[], goRunBits=0, goCa
 // shop / home tap pos
 let tapPos=null;
 
-// ── v2: active glitches / signal state ──────────────
-let runGlitches = [];        // glitches active this run
-let runSignal = null;        // current broadcast signal
-let signalTimer = 0;         // countdown for signal reveal screen
-let signalRerollUsed = false;
-let glitchChoices = [];      // 3 glitches shown before run starts
-let lastCard = null;         // for feedback_loop glitch
-let clawVoice = null;        // { text, timer } speech bubble
-let staticEarned = 0;        // STATIC earned this run
-// signal effect multipliers (reset each run)
-let sigGravMult=1, sigSpeedMult=1, sigGapMult=1, sigBitsMult=1;
-// glitch effect multipliers (reset each run)
-let glitchGravMult=1, glitchGapMult=1, glitchFlapMult=1, glitchBitsMult=1, glitchGapBonus=0;
-// combo threshold offset (bit_magnet glitch: streak builds faster)
-let glitchComboOffset=0;
-
-const CLAW_PIT_LINES = ['Choose wisely.','Refueling.','Your run. Your call.','The pipes await.','Power up.'];
-const CLAW_DEATH_LINES = ['Worth it.','Again.','The static remembers.','Every death is data.','Next run.'];
-
 // XP formula
 function xpToNext(lv) { return lv*100+50; }
-
-// ── v2 helpers ───────────────────────────────────────
-function showClawVoice(text, dur) {
-  clawVoice = { text: text.replace(/"/g,''), timer: dur||140 };
-}
-
-function rollSignal() {
-  const pool = [...SIGNALS, SIGNALS[SIGNALS.length-1]]; // CLEAN appears twice
-  return pool[Math.floor(Math.random()*pool.length)];
-}
-
-function applySignal(sig) {
-  runSignal = sig;
-  sigGravMult=1; sigSpeedMult=1; sigGapMult=1; sigBitsMult=1;
-  if (!sig || sig.id==='none') return;
-  if (sig.id==='heavy')    { sigGravMult=1.35; sigGapMult=1.15; }
-  if (sig.id==='golden')   { sigBitsMult=2; sigGapMult=0.9; }
-  if (sig.id==='turbo')    { sigSpeedMult=1.2; sigBitsMult=1.5; }
-  if (sig.id==='blessed')  { fx.shield=3; }
-}
-
-function pickGlitchChoices() {
-  const available = GLITCHES.filter(r=>!runGlitches.find(a=>a.id===r.id));
-  const shuffled = available.sort(()=>Math.random()-0.5);
-  glitchChoices = shuffled.slice(0,3);
-}
-
-function applyGlitch(g) {
-  const maxSlots = P.traits.relic_slot ? 3 : 2;
-  if (runGlitches.length >= maxSlots) return;
-  runGlitches.push(g);
-  // Recalculate all mult values from active glitches
-  glitchGravMult = runGlitches.find(r=>r.id==='iron_feather') ? 0.8 : 1;
-  glitchGapMult  = runGlitches.find(r=>r.id==='iron_feather') ? 0.9 : 1;
-  glitchFlapMult = runGlitches.find(r=>r.id==='turbo_heart')  ? 1.25: 1;
-  glitchBitsMult = runGlitches.find(r=>r.id==='death_wish')   ? 4   : 1;
-  glitchComboOffset = runGlitches.find(r=>r.id==='bit_magnet')? 2   : 0;
-  if (g.id==='death_wish')   lives=1;
-  if (g.id==='shield_cloak') fx.shield=Math.max(fx.shield||0,1);
-  showClawVoice(g.flavor);
-}
-
-function hasGlitch(id) { return !!runGlitches.find(r=>r.id===id); }
 
 function newRun() {
   P = mkSave();
   bird = { y:H/2-30, vy:0, angle:0, t:0 };
   pipes=[]; score=0; frame=0; gOff=0;
-  lives = 3 + P.upgrades.extraLife + (P.traits.hardened||0);
+  lives = 3 + P.upgrades.extraLife;
   runLevel=1; runLvlPts=0; comboN=0; comboT=0; runBits=0;
   particles=[]; lvlFlash=0;
   fx = { ghost:0, shield:0, gapBonus:0, slowTimer:0, turboTimer:0, doubleBitsTimer:0 };
   pitCards=[]; pitPicked=false; pitTransTimer=0; lastPitScore=-1; pitCountTimer=0;
-  // v2 resets
-  runGlitches=[]; lastCard=null; staticEarned=0; clawVoice=null;
-  sigGravMult=1; sigSpeedMult=1; sigGapMult=1; sigBitsMult=1;
-  glitchGravMult=1; glitchGapMult=1; glitchFlapMult=1; glitchBitsMult=1; glitchGapBonus=0;
-  glitchComboOffset=0; signalRerollUsed=false;
-  // Apply signal that was already rolled before this call
-  if(runSignal) applySignal(runSignal);
 }
 
 function respawn() {
@@ -393,10 +286,6 @@ function drawPipe(x,tH,bY,warn) {
   const EX=6,CAP=18;
   const theme = warn ? { main:'#5c4a00',light:'#c8a000',hi:'#ffd700',dark:'#2a1a00' } : pipeTheme(score);
   const {main,light,hi,dark}=theme;
-  // fog omen: pipes flicker
-  if(runSignal && runSignal.id==='fog') {
-    ctx.globalAlpha = 0.35 + 0.65*Math.abs(Math.sin(Date.now()/600 + x*0.02));
-  }
   if(warn) {
     const glow=0.3+0.2*Math.sin(frame*0.25);
     ctx.shadowColor='#ffd700'; ctx.shadowBlur=12*glow;
@@ -420,8 +309,6 @@ function drawPipe(x,tH,bY,warn) {
     ctx.font='14px serif'; ctx.textAlign='center';
     ctx.fillText('🏁', x+PW/2, tH+8);
   }
-  ctx.globalAlpha=1;
-  ctx.shadowBlur=0;
 }
 
 // ── Draw HUD ─────────────────────────────────────────
@@ -439,10 +326,9 @@ function drawHUD(sc,lv,lf,rb,mx) {
     pts('LEVEL '+lv+'!',W/2,H/2-20,10,'#ffdd44');
     ctx.globalAlpha=1; lvlFlash--;
   }
-  if(comboT>0&&comboN>=(3-glitchComboOffset)) {
+  if(comboT>0&&comboN>=3) {
     ctx.globalAlpha=Math.min(1,comboT/20);
-    const comboCol = comboN>=8 ? '#ff4444' : '#ffaa00';
-    pts('x'+comboN+' STREAK',W/2,64,7,comboCol);
+    pts('x'+comboN+' COMBO',W/2,64,7,'#ffaa00');
     ctx.globalAlpha=1;
   }
   if(rb>0) { pt('BITS +'+rb,W-6,H-GH-10,5,'#ffd70099','right'); }
@@ -477,7 +363,7 @@ function hits() {
   if(bird.y+R>=GYL||bird.y-R<=0) return true;
   for(const p of pipes) {
     if(BX+R>p.x-3&&BX-R<p.x+PW+3) {
-      const gap=(BASE_PG*sigGapMult*glitchGapMult)+(P.upgrades.wideGap*BASE_PG*0.15)+fx.gapBonus;
+      const gap=BASE_PG+(P.upgrades.wideGap*BASE_PG*0.15)+fx.gapBonus;
       if(bird.y-R<p.topH||bird.y+R>p.topH+gap) return true;
     }
   }
@@ -487,27 +373,16 @@ function hits() {
 // ── Pick pit stop cards ──────────────────────────────
 function pickCards() {
   const pool=[...CARDS];
-  const numChoices = P.traits.pit_choice ? 4 : 3;
   const picked=[];
-  // 33% chance one slot is a relic if we have room
-  const maxSlots = P.traits.relic_slot ? 3 : 2;
-  const offerRelic = runGlitches.length < maxSlots && Math.random()<0.33;
-  const relicPool = GLITCHES.filter(r=>!runGlitches.find(a=>a.id===r.id));
-  for(let i=0;i<numChoices&&pool.length;i++) {
-    if(i===0&&offerRelic&&relicPool.length>0) {
-      const ri=Math.floor(Math.random()*relicPool.length);
-      picked.push({...relicPool[ri], isGlitch:true});
-    } else {
-      const idx=Math.floor(Math.random()*pool.length);
-      picked.push(pool.splice(idx,1)[0]);
-    }
+  for(let i=0;i<3&&pool.length;i++) {
+    const idx=Math.floor(Math.random()*pool.length);
+    picked.push(pool.splice(idx,1)[0]);
   }
   return picked;
 }
 
 // ── Apply card ───────────────────────────────────────
 function applyCard(card) {
-  if(card.isGlitch) { applyGlitch(card); return; }
   if(card.id==='ghost')      fx.ghost=2;
   if(card.id==='shield')     fx.shield=3;
   if(card.id==='widegap')    fx.gapBonus+=BASE_PG*0.4;
@@ -515,36 +390,14 @@ function applyCard(card) {
   if(card.id==='turboflap')  fx.turboTimer=600;
   if(card.id==='doublebits') fx.doubleBitsTimer=900;
   if(card.id==='extralife')  lives=Math.min(lives+1,6);
-  // echo_lens: apply same card again (once, no loop)
-  if(hasGlitch('echo_lens') && lastCard && !card.isGlitch) {
-    const prev=lastCard;
-    lastCard=card;
-    applyCard({...prev}); // apply previous card
-    return;
-  }
-  lastCard=card;
   sfxPowerUp();
-  for(let i=0;i<18;i++) cardBurst(BX,bird.y,card.col||card.color);
+  for(let i=0;i<18;i++) cardBurst(BX,bird.y,card.col);
 }
 
 // ── CRT scanlines ────────────────────────────────────
 function drawCRT() {
   ctx.fillStyle='rgba(0,0,0,0.06)';
   for(let y=0;y<H;y+=3) ctx.fillRect(0,y,W,1);
-}
-
-// ── Claw Voice bubble ─────────────────────────────────
-function drawClawVoice() {
-  if(!clawVoice || clawVoice.timer<=0) { clawVoice=null; return; }
-  clawVoice.timer--;
-  const a = clawVoice.timer<30 ? clawVoice.timer/30 : Math.min(1,(130-clawVoice.timer)/15);
-  ctx.globalAlpha=a;
-  ctx.fillStyle='#000000CC';
-  ctx.fillRect(8,52,W-16,20);
-  ctx.fillStyle='#FFFFFF44';
-  ctx.fillRect(8,52,W-16,1);
-  pt(clawVoice.text,W/2,65,5,'#FFFFFF');
-  ctx.globalAlpha=1;
 }
 
 // ── Draw: Panel ────────
@@ -579,34 +432,28 @@ function hitBtn(id) {
 const TUTORIAL_KEY = 'flappyClaw_tutDone';
 const TUTORIAL_SLIDES = [
   {
-    title: 'TAP TO FLY',
-    lines: ['Tap screen or SPACE','to flap Claw.','Dodge the pipes.','Lose all lives: game over.'],
+    title: 'TAP TO FLAP',
+    lines: ['Tap the screen','(or press SPACE)','to make Claw fly.','Dodge the pipes!'],
     icon: '🦞',
     color: '#00ff88',
   },
   {
-    title: 'SIGNALS',
-    lines: ['Every run tunes to a','SIGNAL frequency.','It changes gravity,','gaps, speed, and BITS.'],
-    icon: '📡',
-    color: '#88AAFF',
+    title: 'LIVES',
+    lines: ['You have 3 lives.','Hit a pipe —','lose a life.','Lose all 3: GAME OVER.'],
+    icon: '❤️',
+    color: '#ff4444',
   },
   {
-    title: 'GLITCHES',
-    lines: ['Before each run,','load a GLITCH —','a code exploit that','carries the whole run.'],
-    icon: '🔮',
-    color: '#CCAAFF',
-  },
-  {
-    title: 'CHECKPOINTS',
-    lines: ['Every 25 pipes,','pick a power-up card','(or a mid-run GLITCH)','to keep going.'],
-    icon: '🏁',
+    title: 'PIT STOPS',
+    lines: ['Every 25 pipes,','choose a power-up','card to help you','survive longer!'],
+    icon: '🛑',
     color: '#ffd700',
   },
   {
-    title: 'BITS & STATIC',
-    lines: ['Earn BITS per pipe.','Earn STATIC on crash.','Spend both on','permanent upgrades.'],
-    icon: '⚡',
-    color: '#88DDFF',
+    title: 'BITS & SHOP',
+    lines: ['Earn BITS each pipe.','After game over,','spend them on','permanent upgrades!'],
+    icon: '💰',
+    color: '#ffd700',
   },
 ];
 let tutSlide=0, tutActive=false;
@@ -617,7 +464,7 @@ function startTutorial() {
 function tutDone() {
   localStorage.setItem(TUTORIAL_KEY,'1');
   tutActive=false;
-  runSignal=rollSignal(); signalTimer=120; state='signalreveal';
+  newRun(); state='playing'; bird.vy=BASE_FLAPV;
 }
 
 function drawTutorial() {
@@ -668,73 +515,58 @@ function drawHome() {
   drawSky();
   drawGround(frame*0.5);
 
+  // animated claw preview
   const sk=SKINS[P.equippedSkin]||SKINS.default;
   const by=H/2-110+Math.sin(frame*0.05)*6;
   if(sk.glow) { ctx.shadowColor=sk.glow; ctx.shadowBlur=12; }
   drawBird(W/2,by,0,frame,false,P.equippedSkin);
   ctx.shadowBlur=0;
 
-  pts('FLAPPY',W/2,H/2-62,13,'#ff8040','#400000');
-  pts('CLAW',  W/2,H/2-42,13,'#ff4040','#400000');
-  pt('v2',W/2+52,H/2-40,6,'#ff404088');
+  // title
+  pts('FLAPPY',W/2,H/2-60,13,'#ff8040','#400000');
+  pts('CLAW',  W/2,H/2-40,13,'#ff4040','#400000');
 
-  // stats panel — 2 rows: [LV | BEST | BITS] / [STATIC + XP bar]
-  const py=H/2-16, ph=78, pw=224, px=W/2-pw/2;
+  // stats panel
+  const py=H/2-15, ph=72, pw=220, px=W/2-pw/2;
   drawPanel(px,py,pw,ph,'#000d','#00ff88');
+  pt('LV '+P.level,  px+pw*0.18, py+18, 6, '#ffdd44');
+  pt('BEST',         px+pw*0.5,  py+14, 5, '#666');
+  pt(''+P.highScore, px+pw*0.5,  py+28, 8, '#fff');
+  pt('BITS',         px+pw*0.82, py+14, 5, '#666');
+  pt(''+P.bits,      px+pw*0.82, py+28, 8, '#ffd700');
+  pt('RUNS '+P.totalRuns, W/2, py+52, 5, '#555');
 
-  // row 1
-  pt('LV',     px+26,  py+13, 5, '#888');
-  pts(''+P.level, px+26, py+27, 9, '#ffdd44');
-  pt('BEST',   px+pw/2, py+13, 5, '#888');
-  pts(''+P.highScore, px+pw/2, py+27, 9, '#fff');
-  pt('BITS',   px+pw-26, py+13, 5, '#888', 'right');
-  pts(''+P.bits, px+pw-26, py+27, 9, '#ffd700', 'right');
-
-  // divider
-  ctx.fillStyle='#00ff8820'; ctx.fillRect(px+10,py+36,pw-20,1);
-
-  // row 2: STATIC + RUNS + XP bar
-  ctx.font='9px serif'; ctx.textAlign='left';
-  ctx.fillText('⚡', px+12, py+52);
-  pt(''+P.static+' STATIC', px+26, py+52, 5, '#88DDFF', 'left');
-  pt('RUNS '+P.totalRuns, px+pw-10, py+52, 5, '#555', 'right');
-
+  // XP bar
   const xpNeed=xpToNext(P.level);
   const xpFrac=Math.min(1,P.xp%xpNeed/xpNeed);
-  ctx.fillStyle='#0a0a0a'; ctx.fillRect(px+8,py+62,pw-16,7);
-  ctx.fillStyle='#00ff4488'; ctx.fillRect(px+8,py+62,Math.floor((pw-16)*xpFrac),7);
-  ctx.fillStyle='#00ff88'; ctx.fillRect(px+8,py+62,2,7); // left cap
+  ctx.fillStyle='#111'; ctx.fillRect(px+8,py+60,pw-16,6);
+  ctx.fillStyle='#00ff88'; ctx.fillRect(px+8,py+60,Math.floor((pw-16)*xpFrac),6);
 
-  drawBtn('play','> PLAY <',W/2-64,H/2+70,128,30,'#00ff88',true);
+  // play button
+  drawBtn('play','> PLAY <',W/2-60,H/2+66,120,28,'#00ff88',true);
 
+  // skin cycle button
   const lockedSkins=SKIN_ORDER.filter(id=>id!=='default'&&!P.unlockedSkins.includes(id));
   const nextUnlock=lockedSkins[0];
   const nextSkin=SKINS[nextUnlock];
-  const skinY=H/2+108;
-  drawBtn('skin','SKIN: '+(sk.name.slice(0,8)),W/2-64,skinY,128,22,'#8888ff',true);
-  if(nextSkin) pt('LV'+nextSkin.unlockLv+' unlocks '+nextSkin.name.slice(0,8),W/2,skinY+34,4,'#555');
+  const skinY=H/2+102;
+  drawBtn('skin','SKIN: '+(sk.name.slice(0,6)),W/2-60,skinY,120,22,'#8888ff',true);
+  if(nextSkin) pt('LV'+nextSkin.unlockLv+' → '+nextSkin.name.slice(0,8),W/2,skinY+36,5,'#554');
 
-  // bottom nav row: SHOP | LAB | HOW TO
-  const navY=H/2+148;
-  drawBtn('shop','SHOP',px+4,navY,62,20,'#ffd700',true);
-  drawBtn('forge','LAB',px+pw/2-31,navY,62,20,'#88DDFF',true);
-  drawBtn('howto','HOW TO',px+pw-66,navY,62,20,'#555',true);
+  // how to play button
+  drawBtn('howto','? HOW TO PLAY',W/2-66,H/2+148,132,18,'#444',true);
 
   drawCRT();
 
   if(tapPos) {
     if(hitBtn('play')) {
       if(!localStorage.getItem(TUTORIAL_KEY)) { startTutorial(); }
-      else { runSignal=rollSignal(); signalTimer=120; state='signalreveal'; }
+      else { newRun(); state='playing'; bird.vy=BASE_FLAPV; }
     } else if(hitBtn('skin')) {
       const unlocked=P.unlockedSkins;
       const cur=unlocked.indexOf(P.equippedSkin);
       P.equippedSkin=unlocked[(cur+1)%unlocked.length];
       persist(P);
-    } else if(hitBtn('shop')) {
-      state='shop';
-    } else if(hitBtn('forge')) {
-      state='clawlab';
     } else if(hitBtn('howto')) {
       startTutorial();
     }
@@ -745,7 +577,7 @@ function drawHome() {
 // ── PLAYING ──────────────────────────────────────────
 function tickPlaying() {
   const slow=fx.slowTimer>0?0.6:1;
-  const spd=(1.8+(runLevel-1)*0.12)*slow*sigSpeedMult*(hasGlitch('hot_rod')?1.15:1);
+  const spd=(1.8+(runLevel-1)*0.12)*slow;
   gOff+=spd;
   if(fx.slowTimer>0) fx.slowTimer--;
   if(fx.turboTimer>0) fx.turboTimer--;
@@ -753,41 +585,26 @@ function tickPlaying() {
 
   if(frame%PINT===0) {
     const mn=55,mx=GYL-BASE_PG-55;
+    // mark the pipe that will be the next pit stop as a warning pipe
     const nextPitPipe = Math.ceil((score+1)/PIT_INTERVAL)*PIT_INTERVAL;
     const isPitPipe = (score + 1 + pipes.filter(p=>!p.scored).length) === nextPitPipe;
-    // chaos omen: wilder gap randomization
-    const chaosMod = (runSignal && runSignal.id==='chaos') ? (Math.random()-0.5)*60 : 0;
-    pipes.push({x:W+PW, topH:Math.max(mn,Math.min(mx,(mn+Math.random()*(mx-mn))+chaosMod)), scored:false, pitWarn:isPitPipe});
+    pipes.push({x:W+PW, topH:mn+Math.random()*(mx-mn), scored:false, pitWarn:isPitPipe});
   }
 
-  const fv=BASE_FLAPV*(1+(P.upgrades.flapBoost*0.15))*glitchFlapMult*(fx.turboTimer>0?1.3:1);
-  bird.vy+=GRAV*sigGravMult*glitchGravMult; bird.y+=bird.vy; bird.t++;
+  const fv=BASE_FLAPV*(1+(P.upgrades.flapBoost*0.15))*(fx.turboTimer>0?1.3:1);
+  bird.vy+=GRAV; bird.y+=bird.vy; bird.t++;
   bird.angle=Math.min(Math.PI/3,Math.max(-Math.PI/5,bird.vy*0.09));
 
   for(const p of pipes) {
     p.x-=spd;
     if(!p.scored&&p.x+PW<BX) {
       p.scored=true; score++; runLvlPts++;
-      // bits calculation: base × glitch mult × signal mult + bonuses
-      let b = fx.doubleBitsTimer>0 ? 2 : 1;
-      if(hasGlitch('hot_rod'))    b = Math.ceil(b*1.5);
-      if(hasGlitch('lucky_wing') && Math.random()<0.25) b *= 3;
-      b *= sigBitsMult * glitchBitsMult;
-      if(hasGlitch('coin_press')) b += 2;
-      b = Math.ceil(b);
-      runBits+=b;
+      const b=fx.doubleBitsTimer>0?2:1; runBits+=b;
       comboN++;comboT=55;
       if(score>P.highScore) P.highScore=score;
-      if(runLvlPts>=10) { runLevel++;runLvlPts=0;lvlFlash=80; showClawVoice('LEVEL UP! LV '+runLevel); }
-      // score milestones
-      if(score===25)  showClawVoice('Quarter century.');
-      if(score===50)  showClawVoice('Halfway legend.');
-      if(score===75)  showClawVoice('Unstoppable.');
-      if(score===100) showClawVoice('THREE DIGITS. LETS GO!');
+      if(runLvlPts>=10) { runLevel++;runLvlPts=0;lvlFlash=80; }
       sfxScore();
-      // windfall signal
-      if(runSignal && runSignal.id==='windfall' && score%10===0) { runBits+=10; showClawVoice('+10 RAIN DROP'); }
-      // confetti on checkpoint milestone
+      // confetti on pit stop milestone
       if(score%PIT_INTERVAL===0) {
         const cols=['#ffd700','#ff80ff','#44ffee','#ff6040','#ffffff'];
         for(let i=0;i<30;i++){
@@ -802,18 +619,13 @@ function tickPlaying() {
   comboT=Math.max(0,comboT-1);
   if(comboN>P.bestCombo) P.bestCombo=comboN;
 
-  // combo armor trait
-  if(P.traits.combo_armor && comboN>=8 && !fx.shield) { fx.shield=1; }
-
   // pit stop — show card selection first, countdown after
   if(score>0 && score%PIT_INTERVAL===0 && score!==lastPitScore) {
     lastPitScore=score;
+    // respawn bird to safe center position, clear incoming pipes
     bird = { y:H/2-30, vy:0, angle:0, t:0 };
     pipes = pipes.filter(p=>p.scored);
-    // ghost_mantle: auto-apply ghost at pit stop
-    if(hasGlitch('ghost_mantle')) fx.ghost=2;
     pitCards=pickCards(); pitTransTimer=PIT_TRANS_FRAMES;
-    showClawVoice(CLAW_PIT_LINES[Math.floor(Math.random()*CLAW_PIT_LINES.length)]);
     state='pitstop'; pitPicked=false;
     sfxPitOpen();
     return;
@@ -821,11 +633,7 @@ function tickPlaying() {
 
   if(hits()) {
     if(fx.ghost>0) { fx.ghost--; return; }
-    if(fx.shield>0) { fx.shield--;
-      // shield_cloak: auto-regen shield on respawn
-      if(hasGlitch('shield_cloak') && fx.shield===0) fx.shield=1;
-      return;
-    }
+    if(fx.shield>0) { fx.shield--; return; }
     burst(BX,bird.y); sfxDie(); lives--;
     if(lives>0) { dTimer=80; state='dying'; }
     else { startGameOver(); }
@@ -834,12 +642,11 @@ function tickPlaying() {
 
 function drawPlaying() {
   drawSky();
-  const gap=(BASE_PG*sigGapMult*glitchGapMult)+(P.upgrades.wideGap*BASE_PG*0.15)+fx.gapBonus;
-  for(const p of pipes) drawPipe(p.x,p.topH,p.topH+gap,p.pitWarn);
+  for(const p of pipes) drawPipe(p.x,p.topH,p.topH+BASE_PG+(P.upgrades.wideGap*BASE_PG*0.15)+fx.gapBonus,p.pitWarn);
   drawGround(gOff);
   tickParticles();
   drawBird(BX,bird.y|0,bird.angle,bird.t,false,P.equippedSkin);
-  const maxL=3+P.upgrades.extraLife+(P.traits.hardened||0);
+  const maxL=3+P.upgrades.extraLife;
   drawHUD(score,runLevel,lives,runBits,maxL);
   // pit stop countdown hint (last 5 pipes)
   const toNext=PIT_INTERVAL-(score%PIT_INTERVAL);
@@ -856,20 +663,6 @@ function drawPlaying() {
   if(fx.slowTimer>0)  { pt('T',8+fxi*14,H-GH-8,6,'#ff80ff'); fxi++; }
   if(fx.turboTimer>0) { pt('F',8+fxi*14,H-GH-8,6,'#ff8040'); fxi++; }
   if(fx.doubleBitsTimer>0) { pt('$',8+fxi*14,H-GH-8,6,'#ffd700'); fxi++; }
-  // relic icons (bottom right)
-  if(runGlitches.length>0) {
-    ctx.font='10px serif'; ctx.textAlign='right';
-    runGlitches.forEach((r,i)=>ctx.fillText(r.icon, W-6, H-GH-8-i*14));
-    ctx.textAlign='center';
-  }
-  // omen tint indicator (small text, top right)
-  if(runSignal && runSignal.id!=='none') {
-    ctx.globalAlpha=0.55;
-    pt(runSignal.icon,W-10,12,8,'#fff','right');
-    ctx.globalAlpha=1;
-  }
-  // Claw Voice bubble
-  drawClawVoice();
   drawCRT();
 }
 
@@ -895,12 +688,11 @@ function tickPitCountdown() {
 
 function drawPitCountdown() {
   drawSky();
-  const gap=(BASE_PG*sigGapMult*glitchGapMult)+(P.upgrades.wideGap*BASE_PG*0.15)+fx.gapBonus;
-  for(const p of pipes) drawPipe(p.x,p.topH,p.topH+gap,p.pitWarn);
+  for(const p of pipes) drawPipe(p.x,p.topH,p.topH+BASE_PG+(P.upgrades.wideGap*BASE_PG*0.15),p.pitWarn);
   drawGround(gOff);
   tickParticles();
   drawBird(BX,bird.y|0,0,bird.t,false,P.equippedSkin);
-  const maxL=3+P.upgrades.extraLife+(P.traits.hardened||0);
+  const maxL=3+P.upgrades.extraLife;
   drawHUD(score,runLevel,lives,runBits,maxL);
 
   // countdown number
@@ -922,108 +714,92 @@ function drawPitCountdown() {
 
 // ── PIT STOP (animated) ────────────────────────────────
 function drawPitStop() {
+  // advance transition timer
   if(pitTransTimer>0) pitTransTimer--;
-  const prog=1-(pitTransTimer/PIT_TRANS_FRAMES);
+  const prog=1-(pitTransTimer/PIT_TRANS_FRAMES); // 0→1 as it opens
 
+  // background (still world frozen behind)
   drawSky();
-  const gap=(BASE_PG*sigGapMult*glitchGapMult)+(P.upgrades.wideGap*BASE_PG*0.15)+fx.gapBonus;
-  for(const p of pipes) drawPipe(p.x,p.topH,p.topH+gap,p.pitWarn);
+  for(const p of pipes) drawPipe(p.x,p.topH,p.topH+BASE_PG+(P.upgrades.wideGap*BASE_PG*0.15),p.pitWarn);
   drawGround(gOff);
   drawBird(BX,bird.y|0,0,bird.t,false,P.equippedSkin);
   tickParticles();
 
+  // dark vignette fades in
   const alpha=Math.min(0.82, prog*0.82);
   ctx.fillStyle=`rgba(0,0,0,${alpha})`; ctx.fillRect(0,0,W,H);
 
+  // slide-in offset (cards slide up from bottom)
   const slideOff=(1-prog)*H*0.55;
   ctx.save();
   ctx.translate(0, slideOff);
 
+  // header flashes on
   if(prog>0.4) {
     const flashA=Math.min(1,(prog-0.4)/0.3);
     ctx.globalAlpha=flashA;
+    // glowing title bg strip
     ctx.fillStyle='rgba(255,215,0,0.12)'; ctx.fillRect(0,36,W,32);
     pts('🏁 PIT STOP',W/2,54,10,'#ffd700');
     pt('SCORE: '+score,W/2,70,6,'#aaa');
     ctx.globalAlpha=1;
   }
 
-  const numCards=pitCards.length;
-  const cw=numCards===4?64:76, ch=100, gap2=numCards===4?6:8;
-  const startX=(W-(cw*numCards+gap2*(numCards-1)))/2;
-  const cardY=82;
+  // cards
+  const cw=78,ch=98,gap=7,startX=(W-(cw*3+gap*2))/2;
+  const cardY=84;
   const CARD_RECTS=[];
   for(let i=0;i<pitCards.length;i++) {
     const c=pitCards[i];
-    const cx2=startX+i*(cw+gap2);
-    const cardAlpha=prog>0.25?Math.min(1,(prog-0.25-i*0.06)/0.25):0;
+    const cx2=startX+i*(cw+gap);
+    // stagger each card slightly
+    const cardAlpha=prog>0.25?Math.min(1,(prog-0.25-i*0.08)/0.25):0;
     ctx.globalAlpha=cardAlpha;
     CARD_RECTS.push({x:cx2,y:cardY,w:cw,h:ch,card:c});
 
-    const col=c.isGlitch?c.color:(c.col||'#fff');
-    ctx.shadowColor=col; ctx.shadowBlur=12;
-    drawPanel(cx2,cardY,cw,ch,c.isGlitch?'#08091a':'#08091c',col);
+    // glow ring
+    ctx.shadowColor=c.col; ctx.shadowBlur=10;
+    drawPanel(cx2,cardY,cw,ch,'#0a0a1c',c.col);
     ctx.shadowBlur=0;
 
-    if(c.isGlitch) {
-      pt('GLITCH',cx2+cw/2,cardY+10,3,'#9999ff77');
-    } else {
-      pt('PICK',cx2+cw/2,cardY+10,3,'#ffffff33');
-    }
-    ctx.font='16px serif'; ctx.textAlign='center';
-    ctx.fillText(c.icon, cx2+cw/2, cardY+26);
+    // icon (emoji)
+    ctx.font='20px serif'; ctx.textAlign='center';
+    ctx.fillText(c.icon, cx2+cw/2, cardY+28);
 
-    // name wrap
-    const words=(c.name||'').split(' ');
-    if(words.length<=2) {
-      pts(words[0],cx2+cw/2,cardY+(words.length>1?36:40),5,col);
-      if(words[1]) pts(words[1],cx2+cw/2,cardY+49,5,col);
-    } else {
-      pts(words.slice(0,2).join(' '),cx2+cw/2,cardY+38,4,col);
-      pts(words.slice(2).join(' '),cx2+cw/2,cardY+50,4,col);
-    }
+    // name lines
+    const words=c.name.split(' ');
+    words.forEach((w,wi)=>pt(w,cx2+cw/2,cardY+42+wi*12,5,c.col));
 
-    // divider
-    ctx.fillStyle=col+'22'; ctx.fillRect(cx2+6,cardY+56,cw-12,1);
-
+    // desc (split on /)
     const dlines=c.desc.split('/');
-    dlines.forEach((dl,di)=>pt(dl.trim(),cx2+cw/2,cardY+66+di*11,4,'#778899'));
+    dlines.forEach((dl,di)=>pt(dl.trim(),cx2+cw/2,cardY+72+di*10,4,'#888'));
 
     ctx.globalAlpha=1;
     ctx.shadowBlur=0;
   }
 
-  // signal rescan button (if SIGNAL SCANNER trait and not used)
-  if(P.traits.omen_sight && !signalRerollUsed && runSignal) {
-    ctx.globalAlpha=prog>0.7?Math.min(1,(prog-0.7)/0.2):0;
-    drawBtn('signalswap','RESCAN SIG',W/2-44,cardY+ch+32,88,18,'#7744cc',true);
-    ctx.globalAlpha=1;
-  }
-
+  // skip button
   ctx.globalAlpha=prog>0.7?Math.min(1,(prog-0.7)/0.2):0;
-  drawBtn('pitskip','SKIP',W/2-30,cardY+ch+10,60,20,'#445',true);
+  drawBtn('pitskip','SKIP',W/2-32,cardY+ch+10,64,20,'#555',true);
   ctx.globalAlpha=1;
 
   ctx.restore();
-  drawClawVoice();
   drawCRT();
 
+  // input only when fully transitioned in
   if(pitTransTimer>0||!tapPos) { tapPos=null; return; }
 
   let picked=false;
   for(const r of CARD_RECTS) {
+    // adjust for slide (slideOff is 0 when fully open)
     if(tapPos.x>=r.x&&tapPos.x<=r.x+r.w&&tapPos.y>=r.y&&tapPos.y<=r.y+r.h) {
-      cardBurst(r.x+r.w/2, r.y+r.h/2, r.card.col||r.card.color||'#fff');
+      cardBurst(r.x+r.w/2, r.y+r.h/2, r.card.col);
       applyCard(r.card); picked=true; break;
     }
   }
   if(!picked&&hitBtn('pitskip')) picked=true;
-  if(!picked&&hitBtn('signalswap')&&!signalRerollUsed) {
-    runSignal=rollSignal(); applySignal(runSignal); signalRerollUsed=true;
-    showClawVoice('Signal rerolled: '+runSignal.name);
-    tapPos=null; return;
-  }
   if(picked) {
+    // card picked → start countdown before resuming
     pitCountTimer=PIT_COUNT_FRAMES;
     state='pitcountdown';
   }
@@ -1039,13 +815,12 @@ function tickDying() {
 }
 function drawDying() {
   drawSky();
-  const gap=(BASE_PG*sigGapMult*glitchGapMult)+(P.upgrades.wideGap*BASE_PG*0.15)+fx.gapBonus;
-  for(const p of pipes) drawPipe(p.x,p.topH,p.topH+gap,p.pitWarn);
+  for(const p of pipes) drawPipe(p.x,p.topH,p.topH+BASE_PG+(P.upgrades.wideGap*BASE_PG*0.15),p.pitWarn);
   drawGround(gOff);
   tickParticles();
   drawBird(BX,bird.y|0,Math.PI/2,bird.t,true,P.equippedSkin);
   ctx.fillStyle='rgba(255,40,40,0.2)'; ctx.fillRect(0,0,W,GYL);
-  const maxL=3+P.upgrades.extraLife+(P.traits.hardened||0);
+  const maxL=3+P.upgrades.extraLife;
   drawHUD(score,runLevel,lives,runBits,maxL);
   const prog=1-(dTimer/80);
   if(prog>0.3) {
@@ -1059,15 +834,6 @@ function drawDying() {
 
 // ── OVER GAME ─────
 function startGameOver() {
-  // v2: calculate STATIC earned from crash
-  let staticAmt = Math.floor(score/5)+1;
-  const echoLevel = P.traits.shard_echo||0;
-  if(echoLevel>0) staticAmt = Math.ceil(staticAmt*(1+echoLevel*0.3));
-  staticEarned = staticAmt;
-  P.static = (P.static||0) + staticAmt;
-  // show death voice line
-  showClawVoice(CLAW_DEATH_LINES[Math.floor(Math.random()*CLAW_DEATH_LINES.length)]);
-
   goXpBefore=P.xp; goRunBits=runBits;
   const xpGain=Math.floor(score*10*(1+P.upgrades.xpBoost*0.25));
   P.xp+=xpGain; goXpGain=xpGain;
@@ -1090,334 +856,86 @@ function startGameOver() {
 function drawGameOver() {
   drawSky(); drawGround(gOff);
   drawBird(BX,Math.min(bird.y+goTimer*1.5,GYL-10)|0,Math.PI/2,0,true,P.equippedSkin);
-  ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(0,0,W,H);
 
-  const PNW=224,PNH=242,px=W/2-PNW/2,py=H/2-PNH/2-12;
-  drawPanel(px,py,PNW,PNH,'#040a04','#00ff88');
+  const PNW=220,PNH=220,px=W/2-PNW/2,py=H/2-PNH/2-10;
+  drawPanel(px,py,PNW,PNH,'#060c06','#00ff88');
 
-  pts('GAME OVER',W/2,py+22,10,'#ff4444','#220000');
-  ctx.fillStyle='#00ff8825'; ctx.fillRect(px+8,py+32,PNW-16,1);
+  pts('GAME OVER',W/2,py+24,10,'#ff4444','#220000');
+  ctx.fillStyle='#00ff8830'; ctx.fillRect(px+10,py+34,PNW-20,2);
 
-  // Score vs Best — side by side
-  pt('SCORE',  px+PNW*0.28,py+44, 5,'#555');
-  pt('BEST',   px+PNW*0.72,py+44, 5,'#555');
-  pts(''+score,       px+PNW*0.28,py+64,12,'#00ff88');
-  pts(''+P.highScore, px+PNW*0.72,py+64,12,'#ffdd44');
-  ctx.fillStyle='#00ff8820'; ctx.fillRect(px+8,py+78,PNW-16,1);
+  pt('SCORE',W/2-50,py+50,5,'#666');
+  pt('BEST', W/2+50,py+50,5,'#666');
+  pts(''+score,     W/2-50,py+72,12,'#00ff88');
+  pts(''+P.highScore,W/2+50,py+72,12,'#ffdd44');
 
-  // Earnings row
-  const bitsX=px+PNW*0.32, statX=px+PNW*0.72;
-  pt('BITS',   bitsX, py+90, 4,'#555');
-  pt('STATIC', statX, py+90, 4,'#445566');
-  pts('+'+goRunBits,   bitsX, py+104, 8,'#ffd700');
-  ctx.font='10px serif'; ctx.textAlign='center'; ctx.fillText('⚡',statX-8,py+104);
-  pts('+'+staticEarned, statX+2, py+104, 8,'#88DDFF');
+  ctx.fillStyle='#00ff8830'; ctx.fillRect(px+10,py+86,PNW-20,2);
+
+  // bits earned
+  pts('+'+goRunBits+' BITS',W/2,py+104,8,'#ffd700');
 
   // XP bar
   const xpNeed=xpToNext(P.level);
   const xpFrac=Math.min(1,P.xp/xpNeed);
-  pt('XP',px+16,py+120,4,'#445','left');
-  ctx.fillStyle='#0a0a0a'; ctx.fillRect(px+30,py+113,PNW-46,7);
-  ctx.fillStyle='#00ff88'; ctx.fillRect(px+30,py+113,Math.floor((PNW-46)*xpFrac),7);
-  pt('+'+goXpGain+' xp',px+PNW-10,py+120,4,'#00ff8866','right');
+  pt('XP',px+20,py+120,5,'#555','left');
+  ctx.fillStyle='#111'; ctx.fillRect(px+36,py+113,PNW-52,8);
+  const barW=Math.floor((PNW-52)*xpFrac);
+  ctx.fillStyle='#00ff88'; ctx.fillRect(px+36,py+113,barW,8);
+  pt('+'+goXpGain,px+PNW-14,py+120,5,'#00ff8880','right');
 
-  ctx.fillStyle='#00ff8820'; ctx.fillRect(px+8,py+126,PNW-16,1);
+  if(goNewLevel) pts('LEVEL UP! LV'+P.level,W/2,py+138,7,'#ffdd44');
+  else pt('LV '+P.level,W/2,py+138,6,'#888');
 
-  // Level + rank
-  if(goNewLevel) pts('LEVEL UP! LV'+P.level,W/2,py+143,7,'#ffdd44');
-  else pt('LV '+P.level,W/2,py+143,6,'#556');
+  if(goNewSkins.length>0) pt('UNLOCKED: '+(SKINS[goNewSkins[0]].name.slice(0,8)),W/2,py+154,5,'#ffd700');
 
-  if(goNewSkins.length>0) pt('UNLOCK: '+(SKINS[goNewSkins[0]].name.slice(0,10)),W/2,py+158,5,'#ffd700');
-
-  const RANKS=[[40,'S','#ff8040'],[25,'A','#ffd700'],[10,'B','#c0c0c0'],[3,'C','#cd7f32'],[0,'D','#444']];
+  // rank
+  const RANKS=[[40,'S','#ff8040'],[25,'A','#ffd700'],[10,'B','#c0c0c0'],[3,'C','#cd7f32'],[0,'D','#666']];
   const [,rk,rc]=RANKS.find(([m])=>score>=m);
-  pts('['+rk+']',W/2,py+178,9,rc);
+  pts('['+rk+']',W/2,py+170,9,rc);
 
-  if(score>0&&score>=P.highScore) pts('NEW BEST!',W/2,py+196,6,'#ffdd44','#442200');
-
-  // signal used this run
-  if(runSignal&&runSignal.id!=='none') {
-    ctx.globalAlpha=0.55;
-    ctx.font='8px serif'; ctx.textAlign='center';
-    ctx.fillText(runSignal.icon,W/2-36,py+215);
-    pt(runSignal.name,W/2+4,py+215,4,'#8888aa');
-    ctx.globalAlpha=1;
-  }
-
-  // glitches used this run
-  if(runGlitches.length>0) {
-    ctx.font='9px serif'; ctx.textAlign='center'; ctx.globalAlpha=0.5;
-    runGlitches.forEach((g,i)=>ctx.fillText(g.icon, px+PNW-20-i*14, py+215));
-    ctx.globalAlpha=1;
-  }
+  if(score>=P.highScore&&score>0) pts('NEW BEST!',W/2,py+188,6,'#ffdd44','#442200');
 
   if(goCanInput) {
-    const bw=(PNW-24)/3;
-    drawBtn('goShop','SHOP',  px+8,         py+PNH+4,bw,24,'#ffd700',true);
-    drawBtn('goLab', 'LAB',   px+8+bw+4,    py+PNH+4,bw,24,'#88DDFF',true);
-    drawBtn('goPlay','RETRY', px+8+(bw+4)*2,py+PNH+4,bw,24,'#00ff88',true);
+    drawBtn('goShop','SHOP',W/2-68,py+PNH+4,60,24,'#ffd700',true);
+    drawBtn('goPlay','RETRY',W/2+8,py+PNH+4,60,24,'#00ff88',true);
   } else {
     const dots='.'.repeat(1+Math.floor((90-dTimer)/30)%3);
-    pt(dots,W/2,py+PNH+18,10,'#222');
+    pt(dots,W/2,py+PNH+18,10,'#333');
   }
-  drawClawVoice();
   drawCRT();
 
   if(tapPos&&goCanInput) {
-    if(hitBtn('goShop'))    { state='shop'; tapPos=null; }
-    else if(hitBtn('goLab')) { state='clawlab'; tapPos=null; }
-    else if(hitBtn('goPlay')) { runSignal=rollSignal(); signalTimer=120; state='signalreveal'; tapPos=null; }
+    if(hitBtn('goShop'))  { state='shop'; tapPos=null; }
+    else if(hitBtn('goPlay')) { newRun(); state='playing'; bird.vy=BASE_FLAPV; tapPos=null; }
     else tapPos=null;
   } else tapPos=null;
-}
-
-// ── SIGNAL REVEAL — dramatic broadcast screen ─────────
-function drawSignalReveal() {
-  signalTimer--;
-  const sig = runSignal || SIGNALS[SIGNALS.length-1];
-  const prog = 1-(signalTimer/120);
-  const pulse = 0.6+0.4*Math.sin(Date.now()/280);
-
-  // Background: deep space + signal color wash
-  ctx.fillStyle='#000814'; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle=sig.color+'14'; ctx.fillRect(0,0,W,H);
-
-  // Scanline flicker effect
-  if(frame%4<2) { ctx.fillStyle='rgba(0,0,0,0.08)'; for(let y=0;y<H;y+=2) ctx.fillRect(0,y,W,1); }
-
-  // Corner brackets
-  const bl=16,bt=3;
-  ctx.fillStyle=sig.color+'88';
-  [[0,0],[W-bl,0],[0,H-bt*4],[W-bl,H-bt*4]].forEach(([x,y])=>{
-    ctx.fillRect(x,y,bl,bt); ctx.fillRect(x,y,bt,bl);
-  });
-
-  // "INCOMING SIGNAL" label
-  const labelA = Math.min(1, prog*3);
-  ctx.globalAlpha=labelA*0.5;
-  pt('INCOMING SIGNAL',W/2,H*0.12,5,'#FFFFFF');
-  ctx.globalAlpha=1;
-
-  // Big signal icon
-  const iconA = Math.min(1, (prog-0.1)*3);
-  ctx.globalAlpha=Math.max(0,iconA);
-  ctx.shadowColor=sig.color; ctx.shadowBlur=24*pulse;
-  ctx.font='44px serif'; ctx.textAlign='center';
-  ctx.fillText(sig.icon,W/2,H*0.33);
-  ctx.shadowBlur=0;
-
-  // Signal name (slides up)
-  const nameY = H*0.50 + (1-Math.min(1,(prog-0.2)*2.5))*20;
-  ctx.globalAlpha=Math.max(0,Math.min(1,(prog-0.2)*3));
-  ctx.shadowColor=sig.color; ctx.shadowBlur=10*pulse;
-  pts(sig.name,W/2,nameY,9,sig.color);
-  ctx.shadowBlur=0;
-
-  // Effect line
-  ctx.globalAlpha=Math.max(0,Math.min(1,(prog-0.35)*3));
-  pt(sig.effect,W/2,H*0.625,5,'#CCCCCC');
-
-  // Voice quote
-  ctx.globalAlpha=Math.max(0,Math.min(1,(prog-0.5)*3))*0.7;
-  pt(sig.voice,W/2,H*0.74,4,'#AAAACC');
-  ctx.globalAlpha=1;
-
-  // Progress bar
-  ctx.fillStyle=sig.color+'60';
-  ctx.fillRect(0,H-6,W*prog,6);
-  ctx.fillStyle=sig.color;
-  ctx.fillRect(0,H-6,W*prog*0.3,6);
-
-  drawCRT();
-  if(signalTimer<=0) {
-    showClawVoice(sig.voice);
-    pickGlitchChoices();
-    state='glitchpick';
-  }
-}
-
-// ── GLITCH PICK — choose your exploit before the run ──
-function drawGlitchPick() {
-  drawSky(); drawGround(frame*0.3);
-  ctx.fillStyle='rgba(0,0,0,0.90)'; ctx.fillRect(0,0,W,H);
-
-  pts('LOAD GLITCH',W/2,30,8,'#CCAAFF');
-  pt('pick one to carry all run',W/2,46,4,'#667');
-
-  // Signal reminder strip
-  if(runSignal && runSignal.id!=='none') {
-    ctx.fillStyle='#111122'; ctx.fillRect(12,50,W-24,16);
-    ctx.font='9px serif'; ctx.textAlign='center';
-    ctx.fillText(runSignal.icon,28,62);
-    pt(runSignal.name,W/2+6,62,4,'#8888CC');
-  }
-
-  const cw=80, ch=116, gap=6, startX=(W-(cw*3+gap*2))/2;
-  const cardY=72;
-  const RECTS=[];
-
-  for(let i=0;i<glitchChoices.length;i++) {
-    const r=glitchChoices[i];
-    const cx2=startX+i*(cw+gap);
-    const hover = (frame%60)<30 && i===Math.floor(frame/4)%3; // subtle pulse
-    RECTS.push({x:cx2,y:cardY,w:cw,h:ch,relic:r});
-
-    ctx.shadowColor=r.color; ctx.shadowBlur=hover?14:8;
-    drawPanel(cx2,cardY,cw,ch,'#08081a',r.color);
-    ctx.shadowBlur=0;
-
-    // icon
-    ctx.font='20px serif'; ctx.textAlign='center';
-    ctx.fillText(r.icon,cx2+cw/2,cardY+22);
-
-    // name (wrapped)
-    const words=r.name.split(' ');
-    if(words.length===1) {
-      pts(words[0],cx2+cw/2,cardY+38,6,r.color);
-    } else {
-      pts(words[0],cx2+cw/2,cardY+34,5,r.color);
-      pts(words.slice(1).join(' '),cx2+cw/2,cardY+47,5,r.color);
-    }
-
-    // divider
-    ctx.fillStyle=r.color+'33'; ctx.fillRect(cx2+8,cardY+56,cw-16,1);
-
-    // desc (wrapped at /)
-    const dlines=r.desc.split('/');
-    dlines.forEach((dl,di)=>pt(dl.trim(),cx2+cw/2,cardY+67+di*10,4,'#999'));
-
-    // flavor
-    pt(r.flavor,cx2+cw/2,cardY+ch-10,3,'#555');
-    ctx.globalAlpha=1; ctx.shadowBlur=0;
-  }
-
-  drawBtn('glitchskip','NO GLITCH >',W/2-46,cardY+ch+10,92,20,'#333',true);
-  drawClawVoice();
-  drawCRT();
-
-  if(!tapPos) return;
-  let picked=false;
-  for(const r of RECTS) {
-    if(tapPos.x>=r.x&&tapPos.x<=r.x+r.w&&tapPos.y>=r.y&&tapPos.y<=r.y+r.h) {
-      applyGlitch(r.relic); picked=true; break;
-    }
-  }
-  if(!picked&&hitBtn('glitchskip')) picked=true;
-  if(picked) {
-    newRun();
-    bird.vy=BASE_FLAPV;
-    state='playing';
-  }
-  tapPos=null;
-}
-
-// ── CLAW LAB — permanent neural upgrades ───────────────
-function drawClawLab() {
-  drawSky(); drawGround(0);
-  ctx.fillStyle='rgba(0,0,0,0.92)'; ctx.fillRect(0,0,W,H);
-
-  pts('CLAW LAB',W/2,26,9,'#88DDFF');
-  pt('NEURAL UPGRADES',W/2,40,5,'#44889988');
-
-  // STATIC balance header
-  const balW=120, balX=W/2-balW/2;
-  ctx.fillStyle='#001824'; ctx.fillRect(balX,46,balW,20);
-  ctx.fillStyle='#88DDFF44'; ctx.fillRect(balX,46,balW,2);
-  ctx.font='10px serif'; ctx.textAlign='center';
-  ctx.fillText('⚡',balX+14,62);
-  pt(''+P.static+' STATIC',balX+balW/2+4,62,6,'#88DDFF');
-
-  ctx.fillStyle='#88DDFF20'; ctx.fillRect(12,70,W-24,1);
-
-  NEURAL.forEach((trait,i)=>{
-    const iy=76+i*42;
-    const owned=P.traits[trait.id]||0;
-    const maxed=owned>=trait.max;
-    const canBuy=!maxed&&(P.static||0)>=trait.cost;
-    const bg=maxed?'#060e0c':(canBuy?'#060c12':'#0a0806');
-    const border=maxed?'#88DDFF60':(canBuy?'#88DDFF':'#334455');
-    drawPanel(12,iy,W-24,34,bg,border);
-    ctx.font='11px serif'; ctx.textAlign='left';
-    ctx.fillText(trait.icon,20,iy+20);
-    const nameCol=maxed?'#88DDFF':(canBuy?'#fff':'#555');
-    pt(trait.name,42,iy+12,5,nameCol,'left');
-    pt(trait.desc,42,iy+25,4,canBuy?'#778899':'#3a4855','left');
-    // stack indicator
-    if(trait.max>1) {
-      for(let s=0;s<trait.max;s++) {
-        ctx.fillStyle=s<owned?'#88DDFF':'#1a2030';
-        ctx.fillRect(W-20-s*10,iy+8,7,7);
-      }
-    }
-    if(maxed) {
-      drawBtn('tbuy'+i,'MAXED',W-50,iy+8,38,18,'#88DDFF44',false);
-    } else {
-      ctx.font='7px serif'; ctx.textAlign='left';
-      ctx.fillText('⚡',W-48,iy+22);
-      drawBtn('tbuy'+i,''+trait.cost,W-38,iy+8,28,18,canBuy?'#88DDFF':'#334',canBuy);
-    }
-  });
-
-  drawBtn('labback','< BACK',W/2-40,H-GH-34,80,22,'#445566',true);
-  drawCRT();
-
-  if(tapPos) {
-    NEURAL.forEach((trait,i)=>{
-      if(hitBtn('tbuy'+i)) {
-        const owned=P.traits[trait.id]||0;
-        if(owned<trait.max&&(P.static||0)>=trait.cost) {
-          P.static-=trait.cost;
-          P.traits[trait.id]=(owned+1);
-          persist(P);
-          showClawVoice(trait.name+' INSTALLED');
-        }
-      }
-    });
-    if(hitBtn('labback')) { state='home'; }
-    tapPos=null;
-  }
 }
 
 // ── SHOP ────────────────────────────────────────────
 function drawShop() {
   drawSky(); drawGround(0);
-  ctx.fillStyle='rgba(0,0,0,0.88)'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(0,0,0,0.85)'; ctx.fillRect(0,0,W,H);
 
-  pts('BITS SHOP',W/2,26,9,'#ffd700');
-  pt('PERSISTENT UPGRADES',W/2,40,4,'#7760009');
-
-  // BITS balance
-  const balW=110, balX=W/2-balW/2;
-  ctx.fillStyle='#161200'; ctx.fillRect(balX,46,balW,20);
-  ctx.fillStyle='#ffd70044'; ctx.fillRect(balX,46,balW,2);
-  pt(''+P.bits+' BITS',W/2,62,6,'#ffd700');
-
-  ctx.fillStyle='#ffd70020'; ctx.fillRect(12,70,W-24,1);
+  pts('UPGRADE SHOP',W/2,36,9,'#ffd700');
+  pts('BITS: '+P.bits,W/2,56,7,'#ffd700');
+  ctx.fillStyle='#ffd70030'; ctx.fillRect(20,62,W-40,2);
 
   SHOP_ITEMS.forEach((item,i)=>{
-    const iy=78+i*50;
+    const iy=74+i*52;
     const owned=P.upgrades[item.id]||0;
     const maxed=owned>=item.max;
     const canBuy=!maxed&&P.bits>=item.cost;
-    const bg=maxed?'#0c1008':(canBuy?'#081408':'#0a0906');
-    const border=maxed?'#00ff8860':(canBuy?'#00ff88':'#334433');
-    drawPanel(12,iy,W-24,42,bg,border);
-    const nameCol=maxed?'#00ff88':(canBuy?'#fff':'#556');
-    pt(item.name,44,iy+14,5,nameCol,'left');
-    pt(item.desc,44,iy+27,4,canBuy?'#778877':'#3a4a3a','left');
-    // stack pips
-    for(let s=0;s<item.max;s++) {
-      ctx.fillStyle=s<owned?'#00ff88':'#1a2a1a';
-      ctx.fillRect(W-22-s*10,iy+10,7,7);
-    }
-    if(maxed) {
-      drawBtn('buy'+i,'MAXED',W-52,iy+10,40,18,'#00ff8844',false);
-    } else {
-      drawBtn('buy'+i,''+item.cost+'B',W-42,iy+10,30,18,canBuy?'#ffd700':'#334',canBuy);
-    }
+    const bg=maxed?'#101808':(canBuy?'#081408':'#0d0a04');
+    const border=maxed?'#00ff8860':(canBuy?'#00ff88':'#554');
+    drawPanel(16,iy,W-32,44,bg,border);
+    pt(item.name,68,iy+14,6,canBuy?'#fff':'#666','left');
+    pt(item.desc,68,iy+28,5,canBuy?'#888':'#444','left');
+    pt(owned+'/'+item.max,W-56,iy+14,5,'#555','left');
+    if(maxed) { drawBtn('buy'+i,'MAX',W-42,iy+10,28,20,'#222',false); }
+    else { drawBtn('buy'+i,item.cost+'B',W-42,iy+10,28,20,canBuy?'#ffd700':'#333',canBuy); }
   });
 
-  drawBtn('shopback','< BACK',W/2-40,H-GH-34,80,22,'#445544',true);
+  drawBtn('shopback','< BACK',W/2-36,H-GH-36,72,24,'#888',true);
   drawCRT();
 
   if(tapPos) {
@@ -1474,12 +992,9 @@ function loop() {
     gOff+=0.2;
     drawGameOver();
   }
-  else if(state==='home')         { drawHome(); }
-  else if(state==='tutorial')     { drawTutorial(); }
-  else if(state==='shop')         { drawShop(); }
-  else if(state==='signalreveal') { drawSignalReveal(); }
-  else if(state==='glitchpick')   { drawGlitchPick(); }
-  else if(state==='clawlab')      { drawClawLab(); }
+  else if(state==='home') { frame++; drawHome(); }
+  else if(state==='tutorial') { frame++; drawTutorial(); }
+  else if(state==='shop') { drawShop(); }
   requestAnimationFrame(loop);
 }
 

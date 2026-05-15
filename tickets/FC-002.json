@@ -1,0 +1,9 @@
+{
+  "id": "FC-002",
+  "title": "World Omen — Per-run modifier revealed at run start",
+  "description": "Each run rolls a random World Omen (8 options + none) that changes mechanics for the whole run. Add 'omenreveal' state: dramatic 2s reveal screen showing omen name, effect description, and Claw's reaction. Omens: HEAVY SKY (gravity+35%/gap+20%), GOLDEN FEVER (bits×2/gap-10%), SHADOW REALM (pipes flicker visible), OVERDRIVE (speed+20%/bits×1.5), WINDFALL (every 10 pipes = +10 bonus BITS), CHAOS FLUX (wilder gap randomization), DIVINE GRACE (start with 3 shields), or none. Apply omen modifiers in tickPlaying() and newRun(). Visual: subtle tint on pipes and sky based on active omen (golden tint, dark tint, cyan tint).",
+  "priority": "P1",
+  "status": "todo",
+  "estimate": "L",
+  "tags": ["mechanic", "roguelite", "ui"]
+}

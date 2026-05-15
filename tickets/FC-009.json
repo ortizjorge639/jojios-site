@@ -1,0 +1,9 @@
+{
+  "id": "FC-009",
+  "title": "Run History — Last 5 runs summary on home screen",
+  "description": "Store last 5 runs in save data (runHistory array). Each entry: { score, omen, relics, shards, bits, timestamp }. On home screen, add scrollable 'LAST RUNS' mini panel below main stats showing run thumbnails with omen icon, relic count, and score. Helps players remember builds and creates a sense of run narrative over time.",
+  "priority": "P2",
+  "status": "todo",
+  "estimate": "M",
+  "tags": ["meta-progression", "ui", "narrative"]
+}

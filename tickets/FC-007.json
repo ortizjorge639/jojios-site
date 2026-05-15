@@ -1,0 +1,9 @@
+{
+  "id": "FC-007",
+  "title": "Omen Visuals — Per-omen atmospheric effects",
+  "description": "Apply subtle visual themes based on active World Omen. GOLDEN FEVER: gold tint overlay on pipes, star shimmer. HEAVY SKY: darker sky gradient, slowed star movement. OVERDRIVE: cyan tint pipes, faster star parallax. SHADOW REALM: pipe opacity oscillates (0.4-1.0 sine wave) creating fog/flicker effect. DIVINE GRACE: purple sky tint, gentle purple glow on bird. WINDFALL: occasional falling coin particles. CHAOS FLUX: pink/magenta pipe tint. Implement via omenVisual() helper that draws tint overlay after pipes. Keep subtle — gameplay readability > aesthetics.",
+  "priority": "P2",
+  "status": "todo",
+  "estimate": "M",
+  "tags": ["visual", "ui", "mechanic"]
+}

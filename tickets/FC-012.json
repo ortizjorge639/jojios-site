@@ -1,0 +1,9 @@
+{
+  "id": "FC-012",
+  "title": "JojiOS Integration — State-reactive game mechanics",
+  "description": "Pull JojiOS state (energy, mode, active project) to influence game. Low energy (1-2) → DIVINE GRACE omen auto-selected (forgiving run). BUILD mode → OVERDRIVE omen more likely. PLAY mode → WINDFALL omen more likely. Active project name appears as flavor text on level-up ('building [project]... impressive'). Fetches from /jojios-state.json on game load, influences RNG weights for omen selection. This is the 'living avatar mirror' north star — the game literally knows who's playing.",
+  "priority": "P3",
+  "status": "todo",
+  "estimate": "L",
+  "tags": ["personalization", "jojios", "narrative", "integration"]
+}

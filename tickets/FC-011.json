@@ -1,0 +1,9 @@
+{
+  "id": "FC-011",
+  "title": "Daily Seed — Same omen+relics for everyone each day",
+  "description": "Generate a daily seed from the current date (YYYYMMDD). Seeded RNG determines: today's world omen, today's starting relic pool (fixed 3 options), today's pit stop card pools. All players worldwide get the same run layout. Add 'DAILY RUN' button on home screen. Daily runs cannot use shard traits (fresh playing field). Show daily leaderboard hint (stretch: actual leaderboard via API).",
+  "priority": "P3",
+  "status": "todo",
+  "estimate": "L",
+  "tags": ["mechanic", "social", "roguelite"]
+}

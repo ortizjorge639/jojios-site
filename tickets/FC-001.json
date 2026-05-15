@@ -1,0 +1,9 @@
+{
+  "id": "FC-001",
+  "title": "Relic System — Joker-equivalent passive run modifiers",
+  "description": "Implement 10 RELICS (persistent passive modifiers active for the full run). Player picks 1 relic from 3 random choices at run start (new 'relicpick' state). At pit stops, 1 in 3 choices is a relic instead of a card. Max 3 relic slots (expandable via FC-004 Trait Forge). Show relic slots as icons below the score HUD. Relic effects applied in tickPlaying() and via modified physics constants. RELICS: coin_press (+2 bits/pipe), lucky_wing (25% triple bits), iron_feather (gravity-20%/gap-10%), hot_rod (speed+15%/bits+50%), ghost_mantle (free ghost at each pit), turbo_heart (flap+25%), bit_magnet (combo threshold-2), death_wish (1 life/bits×4), shield_cloak (auto-shield on respawn), echo_lens (duplicate last card effect).",
+  "priority": "P1",
+  "status": "todo",
+  "estimate": "XL",
+  "tags": ["mechanic", "meta-progression", "roguelite"]
+}

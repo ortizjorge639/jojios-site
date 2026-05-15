@@ -1,0 +1,9 @@
+{
+  "id": "FC-006",
+  "title": "Relic HUD — In-run relic slot display",
+  "description": "Show active relics as icon slots in the HUD during gameplay. Position: bottom-right area above ground. Each slot shows relic icon (emoji) and a colored border. Empty slots shown as dim outlines. Max 3 slots (or 2 if RELIC VAULT trait not purchased). Also show World Omen as a small banner/tag on top-right during run (abbreviated omen name + color). This gives players visual feedback on their build at all times and surfaces the omen's presence throughout the run.",
+  "priority": "P1",
+  "status": "todo",
+  "estimate": "M",
+  "tags": ["ui", "mechanic"]
+}

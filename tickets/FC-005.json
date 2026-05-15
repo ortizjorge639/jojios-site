@@ -1,0 +1,9 @@
+{
+  "id": "FC-005",
+  "title": "Claw Voice — Personality flavor text at key moments",
+  "description": "Add CLAW_VOICE system: a speech bubble that appears near the bird with short 1-2 line text at key moments. Auto-dismisses after 90 frames. Triggers: omen reveal (Claw reacts to the world condition), relic pick ('oooh nice', 'this one... maybe'), pit stop arrival ('time to breathe'), level up ('WE COOKING'), death ('welp', 'that pipe CHEATED', 'oof.', 'respect the pipe'), milestone scores (10: 'warming up', 25: 'in the zone', 50: 'this is fine', 100: 'ASCENDED'). Store quotes in CLAW_QUOTES object keyed by trigger type. Render as pixelated speech bubble in top-left area, distinct from score/HUD.",
+  "priority": "P1",
+  "status": "todo",
+  "estimate": "M",
+  "tags": ["narrative", "ui", "personalization"]
+}

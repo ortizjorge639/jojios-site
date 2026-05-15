@@ -1,0 +1,9 @@
+{
+  "id": "FC-003",
+  "title": "Shard Currency — Meta-progression currency earned from death",
+  "description": "Add SHARDS as a second persistent meta-currency. Earned exclusively on death: floor(score/5) + 1 shards per run. Store in save data (shards field). Show shards earned on game over screen alongside bits. Show shard balance on home screen. Add sfxShard sound (crystalline tone). Shards cannot be earned any other way — death is the only source. This reframes every death as investment rather than pure failure. Display with a crystal/gem icon (💎) to distinguish from BITS (💰).",
+  "priority": "P1",
+  "status": "todo",
+  "estimate": "S",
+  "tags": ["mechanic", "meta-progression", "economy"]
+}

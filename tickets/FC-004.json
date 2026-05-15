@@ -1,0 +1,9 @@
+{
+  "id": "FC-004",
+  "title": "Trait Forge — Shard-powered permanent upgrade shop",
+  "description": "New shop state ('traitforge') accessible from home screen. 6 traits purchasable with SHARDS: HARDENED (start +1 life, 30s, max1), RELIC VAULT (unlock 3rd relic slot, 60s, max1), WIDER DRAW (4 pit stop choices, 40s, max1), ECHO SHARDS (earn 30% more shards, 25s, max2), COMBO ARMOR (combo 8+ auto-shields, 35s, max1), OMEN SIGHT (reroll omen once per run, 50s, max1). Store trait ownership in save.traits object. UI: same panel style as BITS shop but with shard currency. Add 'FORGE' button to home screen. Apply traits throughout gameplay.",
+  "priority": "P1",
+  "status": "todo",
+  "estimate": "L",
+  "tags": ["mechanic", "meta-progression", "ui", "economy"]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "FC-008",
+  "title": "Relic Synergy Hints — Combo detection UI",
+  "description": "Detect when active relics have known synergies and display a  SYNERGY!' flash message during the run. Known synergies: hot_rod + coin_press (speed+bits both boosted = 'JACKPOT BUILD'), death_wish + lucky_wing (risky bits game = 'GLASS CANNON'), shield_cloak + ghost_mantle (max survivability = 'TANK BUILD'), turbo_heart + iron_feather (gravity tradeoff balanced = 'CALIBRATED'). Show on first pipe after relic pick with 3s duration. Add synergy name to run stats on game over.",brief '
+  "priority": "P2",
+  "status": "todo",
+  "estimate": "S",
+  "tags": ["mechanic", "ui", "roguelite"]
+}

@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Flappy Claw v2</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; touch-action: none; }
+    body { display: flex; justify-content: center; align-items: center;
+           min-height: 100dvh; min-height: -webkit-fill-available; }
+    canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; cursor: pointer; }
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// ── Persistent save ─────────────────────────────────
+const SAVE_KEY = 'flappyClaw_v2';
+function loadSave() {
+  try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch(e) { return {}; }
+}
+function mkSave() {
+  const s = loadSave();
+  return {
+    bits:          s.bits          ?? 0,
+    level:         s.level         ?? 1,
+    xp:            s.xp            ?? 0,
+    highScore:     s.highScore     ?? 0,
+    equippedSkin:  s.equippedSkin  ?? 'default',
+    unlockedSkins: s.unlockedSkins ?? ['default'],
+    upgrades:      s.upgrades      ?? { extraLife:0, wideGap:0, flapBoost:0, xpBoost:0 },
+    totalRuns:     s.totalRuns     ?? 0,
+    bestCombo:     s.bestCombo     ?? 0,
+    shards:        s.shards        ?? 0,
+    traits:        s.traits        ?? {},
+  };
+}
+function persist(P) { localStorage.setItem(SAVE_KEY, JSON.stringify(P)); }
+
+// ── Skins ────────────────────────────────────────────
+const SKINS = {
+  default: { name:'CLAW',       c1:'#e84040', c2:'#cc2020', glow:null },
+  ice:     { name:'ICE CLAW',   c1:'#40a8e8', c2:'#2080c0', glow:'#80d0ff', unlockLv:5  },
+  lava:    { name:'LAVA CLAW',  c1:'#ff8020', c2:'#cc5000', glow:'#ff6000', unlockLv:10 },
+  neon:    { name:'NEON CLAW',  c1:'#40ff80', c2:'#00cc50', glow:'#00ff88', unlockLv:15 },
+  gold:    { name:'GOLD CLAW',  c1:'#ffd700', c2:'#cc9900', glow:'#ffdd44', unlockLv:25 },
+  dark:    { name:'DARK CLAW',  c1:'#8040ff', c2:'#5020cc', glow:'#8000ff', unlockLv:50 },
+};
+const SKIN_ORDER = ['default','ice','lava','neon','gold','dark'];
+
+// ── pool Card ───────
+const CARDS = [
+  { id:'ghost',      name:'GHOST WING',  desc:'Phase thru/2 pipes',   col:'#a0a0ff', icon:'👻' },
+  { id:'shield',     name:'SHIELD',      desc:'Block next/3 hits',     col:'#4080ff', icon:'🛡' },
+  { id:'widegap',    name:'WIDE GAP',    desc:'+40% gap/8 pipes',      col:'#80ff40', icon:'↕' },
+  { id:'doublebits', name:'DOUBLE BITS', desc:'2× BITS/15 pipes',      col:'#ffd700', icon:'💰' },
+  { id:'slowtime',   name:'SLOW TIME',   desc:'-45% speed/12 pipes',   col:'#ff80ff', icon:'⏳' },
+  { id:'extralife',  name:'EXTRA LIFE',  desc:'+1 life instantly',      col:'#ff4444', icon:'❤️' },
+  { id:'turboflap',  name:'TURBO FLAP', desc:'Flap 35% higher/10p',   col:'#ff8040', icon:'⚡' },
+];
+
+// ── items Shop ──────────────
+const SHOP_ITEMS = [
+  { id:'extraLife',  name:'EXTRA LIFE', desc:'Start +1 life',      cost:50, max:2 },
+  { id:'wideGap',    name:'WIDE GAP',   desc:'Default gap +15%',   cost:40, max:3 },
+  { id:'flapBoost',  name:'FLAP BOOST', desc:'Jump 15% higher',    cost:30, max:3 },
+  { id:'xpBoost',    name:'XP BOOST',   desc:'25% more XP/run',    cost:60, max:2 },
+];
+
+// ── Relics (Balatro Jokers) ───────────────────────────
+const RELICS = [
+  { id:'coin_press',   name:'COIN PRESS',   icon:'🪙', color:'#FFD700', desc:'+2 BITS per pipe',       flavor:'"Every pipe, a paycheck."' },
+  { id:'lucky_wing',   name:'LUCKY WING',   icon:'🍀', color:'#00FF88', desc:'25% chance: BITS x3',    flavor:'"Luck favors the reckless."' },
+  { id:'iron_feather', name:'IRON FEATHER', icon:'⚙️', color:'#AAAAAA', desc:'Gravity -20%, gap -10%', flavor:'"Built different."' },
+  { id:'hot_rod',      name:'HOT ROD',      icon:'🔥', color:'#FF4400', desc:'Speed +15%, BITS +50%',  flavor:'"Go fast or go broke."' },
+  { id:'ghost_mantle', name:'GHOST MANTLE', icon:'👻', color:'#88AAFF', desc:'Free ghost each pit',    flavor:'"Untouchable, briefly."' },
+  { id:'turbo_heart',  name:'TURBO HEART',  icon:'💜', color:'#CC44FF', desc:'Flap velocity +25%',     flavor:'"Feel that? Power."' },
+  { id:'bit_magnet',   name:'BIT MAGNET',   icon:'🧲', color:'#00DDFF', desc:'Combo threshold -2',     flavor:'"The grind never stops."' },
+  { id:'death_wish',   name:'DEATH WISH',   icon:'💀', color:'#FF0055', desc:'1 life only, BITS x4',   flavor:'"The stakes are everything."' },
+  { id:'shield_cloak', name:'SHIELD CLOAK', icon:'🛡️', color:'#44FFAA', desc:'Auto-shield on respawn', flavor:'"Claw protects Claw."' },
+  { id:'echo_lens',    name:'ECHO LENS',    icon:'🔮', color:'#FFAAFF', desc:'Last card effect repeats',flavor:'"Once more, with feeling."' },
+];
+
+// ── World Omens (Hades Boss Blind) ───────────────────
+const OMENS = [
+  { id:'heavy',    name:'HEAVY SKY',    icon:'⛈️', color:'#4455AA', effect:'Gravity +35%, Gap wider',    voice:'"This gonna hurt."' },
+  { id:'golden',   name:'GOLDEN FEVER', icon:'✨', color:'#FFD700', effect:'BITS x2, Gap tighter',        voice:'"Show me the money."' },
+  { id:'fog',      name:'SHADOW REALM', icon:'👁️', color:'#880088', effect:'Pipes flicker in/out',        voice:'"Trust your instincts."' },
+  { id:'turbo',    name:'OVERDRIVE',    icon:'⚡', color:'#00FFCC', effect:'Speed +20%, BITS x1.5',        voice:'"No brakes."' },
+  { id:'windfall', name:'WINDFALL',     icon:'💰', color:'#FFAA00', effect:'Every 10 pipes: +10 BITS',     voice:'"Let it rain."' },
+  { id:'chaos',    name:'CHAOS FLUX',   icon:'🌀', color:'#FF00FF', effect:'Pipe gaps randomize wildly',   voice:'"Nothing is predictable."' },
+  { id:'blessed',  name:'DIVINE GRACE', icon:'🌟', color:'#AAAAFF', effect:'Start with 3 shields',         voice:'"Even Claw gets lucky sometimes."' },
+  { id:'none',     name:'CLEAR SKIES',  icon:'🌤️', color:'#44AAFF', effect:'Standard run',                 voice:'"Classic mode. Respect."' },
+];
+
+// ── Trait Forge (Hades Mirror) ───────────────────────
+const TRAITS = [
+  { id:'hardened',    name:'HARDENED',    icon:'❤️', desc:'Start with +1 life',            cost:30, max:1 },
+  { id:'relic_slot',  name:'RELIC VAULT', icon:'🎴', desc:'Unlock 3rd relic slot',          cost:60, max:1 },
+  { id:'pit_choice',  name:'WIDER DRAW',  icon:'🃏', desc:'4 choices at pit stops',         cost:40, max:1 },
+  { id:'shard_echo',  name:'ECHO SHARDS', icon:'💎', desc:'+30% shards per death',          cost:25, max:2 },
+  { id:'combo_armor', name:'COMBO ARMOR', icon:'🦺', desc:'Combo 8+ auto-activates shield', cost:35, max:1 },
+  { id:'omen_sight',  name:'OMEN SIGHT',  icon:'🔭', desc:'Reroll omen once per run',       cost:50, max:1 },
+];
+
+// ── Canvas setup ─────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+const W = 288, H = 512;
+let scale = 1;
+function resize() {
+  const vp = window.visualViewport;
+  const vw = vp ? vp.width  : window.innerWidth;
+  const vh = vp ? vp.height : window.innerHeight;
+  scale = Math.min(vw/W, vh/H);
+  canvas.width  = Math.floor(W*scale);
+  canvas.height = Math.floor(H*scale);
+  ctx.setTransform(scale,0,0,scale,0,0);
+  ctx.imageSmoothingEnabled = false;
+}
+resize();
+window.addEventListener('resize', resize);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
+
+// ── Constants ────────────────────────────────────────
+const GRAV=0.28, BASE_FLAPV=-5.0, PW=52, BASE_PG=118, GH=72, GYL=H-GH, BX=70, PINT=88;
+const STARS = Array.from({length:40}, ()=>({ x:Math.random()*W|0, y:Math.random()*(GYL*0.9)|0, b:Math.random()*8|0 }));
+
+// ── Vaporwave Audio ──────────────────────────────────
+let _ac=null;
+function ac(){if(!_ac)_ac=new(window.AudioContext||window.webkitAudioContext)();return _ac;}
+function playTone(freq,type,vol,dur,detune=0,delay=0){
+  try{
+    const a=ac(),o=a.createOscillator(),g=a.createGain(),rev=a.createGain();
+    o.type=type; o.frequency.value=freq; o.detune.value=detune;
+    g.gain.setValueAtTime(vol,a.currentTime+delay);
+    g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+delay+dur);
+    o.connect(g);g.connect(a.destination);
+    o.start(a.currentTime+delay); o.stop(a.currentTime+delay+dur);
+  }catch(e){}
+}
+function sfxFlap(){
+  playTone(420,'sine',0.09,0.07);
+  playTone(320,'sine',0.05,0.05,0,0.03);
+}
+function sfxScore(){
+  playTone(660,'triangle',0.07,0.05);
+  playTone(880,'triangle',0.05,0.04,0,0.04);
+}
+function sfxPitScore(){ // big milestone — vaporwave chord
+  [220,330,440,554].forEach((f,i)=>playTone(f,'sine',0.1,0.5,0,i*0.04));
+  playTone(880,'sine',0.06,0.7,0,0.1);
+}
+function sfxCountdown(n){ // 3-2-1 ticks
+  playTone(n===0?880:440,'square',0.1,0.12);
+}
+function sfxPitOpen(){ // dreamy chord stab
+  [330,415,554,660].forEach((f,i)=>playTone(f,'sine',0.12,0.9,-10+i*5,i*0.02));
+}
+function sfxPowerUp(){
+  [440,554,660,880].forEach((f,i)=>playTone(f,'triangle',0.09,0.15,0,i*0.06));
+}
+function sfxDie(){
+  playTone(220,'sawtooth',0.12,0.15);
+  playTone(160,'sawtooth',0.1,0.2,0,0.12);
+  playTone(110,'sawtooth',0.08,0.3,0,0.25);
+}
+
+// ── State ────────────────────────────────────────────
+let state = 'home';
+let P = mkSave();
+let frame=0;
+
+// run state — initialised to safe defaults so home screen draws before newRun()
+let bird = { y:H/2-30, vy:0, angle:0, t:0 };
+let pipes=[], score=0, gOff=0, lives=3, runLevel=1, runLvlPts=0, comboN=0, comboT=0, runBits=0;
+let dTimer=0, particles=[], lvlFlash=0;
+let fx={ ghost:0, shield:false, gapBonus:0, slowTimer:0, turboTimer:0, doubleBitsTimer:0 };
+
+// pit stop
+let pitCards=[], pitPicked=false, pitTransTimer=0, lastPitScore=-1;
+let pitCountTimer=0; // countdown before entering pitstop
+const PIT_INTERVAL=25;
+const PIT_TRANS_FRAMES=22;
+const PIT_COUNT_FRAMES=150; // ~2.5s countdown (3-2-1 GO) — after card pick
+
+// gameover
+let goXpBefore=0, goXpGain=0, goNewLevel=false, goNewSkins=[], goRunBits=0, goCanInput=false, goTimer=0;
+
+// shop / home tap pos
+let tapPos=null;
+
+// ── v2: Relics / Omens / Shards ──────────────────────
+let runRelics = [];        // active relics this run
+let runOmen = null;        // current world omen
+let omenTimer = 0;         // countdown for omen reveal screen
+let omenRerollUsed = false;
+let relicChoices = [];     // 3 relics shown in relicpick state
+let lastCard = null;       // for echo_lens relic
+let clawVoice = null;      // { text, timer } speech bubble
+let shardsEarned = 0;      // shards earned this run (shown on game over)
+// Omen/relic effect multipliers (reset each run)
+let omenGravMult=1, omenSpeedMult=1, omenGapMult=1, omenBitsMult=1;
+let relicGravMult=1, relicGapMult=1, relicFlapMult=1, relicGapBonus=0;
+
+const CLAW_PIT_LINES = ['"Choose wisely."','"Refueling the dream."','"Your run. Your call."','"The pipes await."'];
+const CLAW_DEATH_LINES = ['"Worth it."','"Again."','"The shards remember."','"Every death is data."'];
+
+// XP formula
+function xpToNext(lv) { return lv*100+50; }
+
+// ── v2 helpers ───────────────────────────────────────
+function showClawVoice(text, dur) {
+  clawVoice = { text: text.replace(/"/g,''), timer: dur||130 };
+}
+
+function rollOmen() {
+  const pool = [...OMENS, OMENS[OMENS.length-1]]; // 'none' appears twice
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+function applyOmen(omen) {
+  runOmen = omen;
+  omenGravMult=1; omenSpeedMult=1; omenGapMult=1; omenBitsMult=1;
+  if (!omen || omen.id==='none') return;
+  if (omen.id==='heavy')    { omenGravMult=1.35; omenGapMult=1.15; }
+  if (omen.id==='golden')   { omenBitsMult=2; omenGapMult=0.9; }
+  if (omen.id==='turbo')    { omenSpeedMult=1.2; omenBitsMult=1.5; }
+  if (omen.id==='blessed')  { fx.shield=3; }
+}
+
+function pickRelicChoices() {
+  const available = RELICS.filter(r=>!runRelics.find(a=>a.id===r.id));
+  const shuffled = available.sort(()=>Math.random()-0.5);
+  relicChoices = shuffled.slice(0,3);
+}
+
+function applyRelic(relic) {
+  const maxSlots = P.traits.relic_slot ? 3 : 2;
+  if (runRelics.length >= maxSlots) return;
+  runRelics.push(relic);
+  relicGravMult = runRelics.find(r=>r.id==='iron_feather') ? 0.8 : 1;
+  relicGapMult  = runRelics.find(r=>r.id==='iron_feather') ? 0.9 : 1;
+  relicFlapMult = runRelics.find(r=>r.id==='turbo_heart')  ? 1.25: 1;
+  if (relic.id==='death_wish') lives=1;
+  if (relic.id==='shield_cloak') fx.shield=Math.max(fx.shield||0,1);
+  showClawVoice(relic.flavor);
+}
+
+function hasRelic(id) { return !!runRelics.find(r=>r.id===id); }
+
+function newRun() {
+  P = mkSave();
+  bird = { y:H/2-30, vy:0, angle:0, t:0 };
+  pipes=[]; score=0; frame=0; gOff=0;
+  lives = 3 + P.upgrades.extraLife + (P.traits.hardened||0);
+  runLevel=1; runLvlPts=0; comboN=0; comboT=0; runBits=0;
+  particles=[]; lvlFlash=0;
+  fx = { ghost:0, shield:0, gapBonus:0, slowTimer:0, turboTimer:0, doubleBitsTimer:0 };
+  pitCards=[]; pitPicked=false; pitTransTimer=0; lastPitScore=-1; pitCountTimer=0;
+  // v2 resets
+  runRelics=[]; lastCard=null; shardsEarned=0; clawVoice=null;
+  omenGravMult=1; omenSpeedMult=1; omenGapMult=1; omenBitsMult=1;
+  relicGravMult=1; relicGapMult=1; relicFlapMult=1; relicGapBonus=0;
+  omenRerollUsed=false;
+  // Apply omen that was already rolled before this call
+  if(runOmen) applyOmen(runOmen);
+}
+
+function respawn() {
+  bird = { y:H/2-30, vy:0, angle:0, t:0 };
+  pipes = pipes.filter(p=>p.x>BX+120);
+  comboN=0;
+}
+
+// ── Text helpers ─────────────────────────────────────
+function pt(txt,x,y,sz,col,align) {
+  ctx.font = sz+'px "Press Start 2P",monospace';
+  ctx.textAlign = align||'center';
+  ctx.fillStyle = col;
+  ctx.fillText(txt,x,y);
+}
+function pts(txt,x,y,sz,col,sh) {
+  ctx.font = sz+'px "Press Start 2P",monospace';
+  ctx.textAlign='center';
+  ctx.fillStyle = sh||'#000';
+  ctx.fillText(txt,x+2,y+2);
+  ctx.fillStyle=col;
+  ctx.fillText(txt,x,y);
+}
+
+// ── Draw bird ────────────────────────────────────────
+function drawBird(cx,cy,ang,t,dead,skinId) {
+  const sk = SKINS[skinId]||SKINS.default;
+  const P2=3;
+  const c1=dead ? '#884040' : sk.c1;
+  const c2=dead ? '#661818' : sk.c2;
+  const G=[
+    [0,0,1,1,1,0,0],
+    [0,1,1,2,1,1,0],
+    [3,1,1,1,1,1,3],
+    [1,1,1,1,1,1,1],
+    [0,1,1,1,1,1,0],
+    [0,0,1,0,1,0,0],
+  ];
+  const ox=-(G[0].length*P2)/2, oy=-(G.length*P2)/2;
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.rotate(ang);
+  if (sk.glow && !dead) {
+    ctx.shadowColor=sk.glow; ctx.shadowBlur=8;
+  }
+  for (let r=0;r<G.length;r++) for (let c=0;c<G[r].length;c++) {
+    const v=G[r][c]; if(!v) continue;
+    ctx.fillStyle = v===2?'#fff':v===3?c2:c1;
+    ctx.fillRect(ox+c*P2,oy+r*P2,P2,P2);
+  }
+  ctx.shadowBlur=0;
+  if (!dead) {
+    ctx.fillStyle=c2;
+    ctx.fillRect(ox+7*P2,oy+P2,P2*2,P2*2);
+    ctx.fillRect(ox-P2*2,oy+3*P2,P2*2,P2*2);
+  }
+  const fl=Math.floor(t/8)%2;
+  ctx.fillStyle=c2;
+  ctx.fillRect(ox+2*P2,oy-(fl?2:1)*P2,P2,P2*2);
+  ctx.fillRect(ox+4*P2,oy-(fl?1:2)*P2,P2,P2*2);
+  ctx.restore();
+}
+
+// ── Draw sky ─────────────────────────────────────────
+function drawSky() {
+  // Gradually shift sky toward gold as we approach next pit stop
+  const nextPit = Math.ceil(score / PIT_INTERVAL) * PIT_INTERVAL;
+  const warmup = Math.max(0, 1 - (nextPit - score) / 8); // last 8 pipes before pit stop
+  const r1 = Math.round(13 + warmup * 40);
+  const g1 = Math.round(13 + warmup * 10);
+  const b1 = Math.round(26 - warmup * 10);
+  ctx.fillStyle=`rgb(${r1},${g1},${b1})`; ctx.fillRect(0,0,W,GYL);
+  ctx.fillStyle=`rgba(${r1+10},${g1+10},${b1+10},1)`;
+  for(let x=0;x<W;x+=16) ctx.fillRect(x,0,1,GYL);
+  for(let y=0;y<GYL;y+=16) ctx.fillRect(0,y,W,1);
+  for(const s of STARS) {
+    const on=((frame>>3)+s.b)%8<4;
+    const starCol = warmup>0.3 ? `rgba(255,${Math.round(200+warmup*55)},${Math.round(100-warmup*100)},1)` : '#ffffff';
+    ctx.fillStyle=on?starCol:'#333355';
+    ctx.fillRect(s.x,s.y,2,2);
+  }
+  // warning glow at horizon when approaching pit stop
+  if(warmup>0.1) {
+    const grd=ctx.createLinearGradient(0,GYL-60,0,GYL);
+    grd.addColorStop(0,`rgba(255,200,0,0)`);
+    grd.addColorStop(1,`rgba(255,180,0,${warmup*0.25})`);
+    ctx.fillStyle=grd; ctx.fillRect(0,GYL-60,W,60);
+  }
+}
+
+// ── Draw ground ──────────────────────────────────────
+function drawGround(off) {
+  ctx.fillStyle='#3a2a0a'; ctx.fillRect(0,GYL,W,GH);
+  ctx.fillStyle='#8B6020'; ctx.fillRect(0,GYL,W,5);
+  ctx.fillStyle='#c08030'; ctx.fillRect(0,GYL+5,W,5);
+  ctx.fillStyle='#8B6020'; ctx.fillRect(0,GYL+10,W,2);
+  ctx.font='6px "Press Start 2P",monospace';
+  ctx.textAlign='left';
+  ctx.fillStyle='rgba(255,180,40,0.55)';
+  const txt='HEARTBEAT OK   BITS: '+(P.bits+runBits)+'   LV '+P.level+'   ';
+  const tw=ctx.measureText(txt).width;
+  const ox2=W-((off*0.7)%tw);
+  ctx.fillText(txt,ox2-tw,GYL+24);
+  ctx.fillText(txt,ox2,GYL+24);
+}
+
+// ── Pipe theme by score ──────────────────────────────
+function pipeTheme(sc) {
+  if(sc>=75) return { main:'#2a005c',light:'#7a00cc',hi:'#cc44ff',dark:'#150030', name:'cosmic' }; // purple cosmic
+  if(sc>=50) return { main:'#5c1000',light:'#cc2200',hi:'#ff6040',dark:'#2a0500', name:'lava'   }; // red lava
+  if(sc>=25) return { main:'#005c4a',light:'#00aaaa',hi:'#44ffee',dark:'#002a20', name:'cyber'  }; // teal cyber
+  return              { main:'#1a5c1a',light:'#2d8a2d',hi:'#4aaa4a',dark:'#0f3a0f', name:'forest'}; // default green
+}
+
+// ── Draw pipe ────────────────────────────────────────
+function drawPipe(x,tH,bY,warn) {
+  const EX=6,CAP=18;
+  const theme = warn ? { main:'#5c4a00',light:'#c8a000',hi:'#ffd700',dark:'#2a1a00' } : pipeTheme(score);
+  const {main,light,hi,dark}=theme;
+  // fog omen: pipes flicker
+  if(runOmen && runOmen.id==='fog') {
+    ctx.globalAlpha = 0.35 + 0.65*Math.abs(Math.sin(Date.now()/600 + x*0.02));
+  }
+  if(warn) {
+    const glow=0.3+0.2*Math.sin(frame*0.25);
+    ctx.shadowColor='#ffd700'; ctx.shadowBlur=12*glow;
+  }
+  ctx.fillStyle=main;  ctx.fillRect(x+2,0,PW-4,tH-CAP);
+  ctx.fillStyle=light; ctx.fillRect(x+2,0,5,tH-CAP);
+  ctx.fillStyle=dark;  ctx.fillRect(x+PW-7,0,5,tH-CAP);
+  ctx.fillStyle=hi;    ctx.fillRect(x+3,0,2,tH-CAP);
+  ctx.fillStyle=light; ctx.fillRect(x-EX,tH-CAP,PW+EX*2,CAP);
+  ctx.fillStyle=hi;    ctx.fillRect(x-EX,tH-CAP,PW+EX*2,4);
+  ctx.fillStyle=dark;  ctx.fillRect(x-EX,tH-4,PW+EX*2,4);
+  ctx.fillStyle=light; ctx.fillRect(x-EX,bY,PW+EX*2,CAP);
+  ctx.fillStyle=hi;    ctx.fillRect(x-EX,bY,PW+EX*2,4);
+  ctx.fillStyle=dark;  ctx.fillRect(x-EX,bY+CAP-4,PW+EX*2,4);
+  ctx.fillStyle=main;  ctx.fillRect(x+2,bY+CAP,PW-4,GYL-bY-CAP);
+  ctx.fillStyle=light; ctx.fillRect(x+2,bY+CAP,5,GYL-bY-CAP);
+  ctx.fillStyle=dark;  ctx.fillRect(x+PW-7,bY+CAP,5,GYL-bY-CAP);
+  ctx.fillStyle=hi;    ctx.fillRect(x+3,bY+CAP,2,GYL-bY-CAP);
+  if(warn) {
+    ctx.shadowBlur=0;
+    ctx.font='14px serif'; ctx.textAlign='center';
+    ctx.fillText('🏁', x+PW/2, tH+8);
+  }
+  ctx.globalAlpha=1;
+  ctx.shadowBlur=0;
+}
+
+// ── Draw HUD ─────────────────────────────────────────
+function drawHUD(sc,lv,lf,rb,mx) {
+  pts(''+sc,W/2,38,16,'#ffffff','#00000088');
+  for(let i=0;i<mx;i++) {
+    const hx=8+i*16,hy=6;
+    ctx.fillStyle=i<lf?'#ff4444':'#3a1a1a';
+    [[0,1,0,1,0],[1,1,1,1,1],[0,1,1,1,0],[0,0,1,0,0]].forEach((row,r)=>
+      row.forEach((p,c)=>p&&ctx.fillRect(hx+c*3,hy+r*3,3,3)));
+  }
+  if(lv>1) { pt('LV'+lv,W-5,15,6,'#000','right'); pt('LV'+lv,W-7,13,6,'#ffdd44','right'); }
+  if(lvlFlash>0) {
+    ctx.globalAlpha=Math.min(1,lvlFlash/30);
+    pts('LEVEL '+lv+'!',W/2,H/2-20,10,'#ffdd44');
+    ctx.globalAlpha=1; lvlFlash--;
+  }
+  if(comboT>0&&comboN>=3) {
+    ctx.globalAlpha=Math.min(1,comboT/20);
+    pts('x'+comboN+' COMBO',W/2,64,7,'#ffaa00');
+    ctx.globalAlpha=1;
+  }
+  if(rb>0) { pt('BITS +'+rb,W-6,H-GH-10,5,'#ffd70099','right'); }
+}
+
+// ── Particles ────────────────────────────────────────
+function burst(x,y) {
+  const cols=['#ff4040','#ff8040','#ffcc40','#ff4088','#ffffff'];
+  for(let i=0;i<12;i++) {
+    const a=(i/12)*Math.PI*2+Math.random()*0.3,spd=2+Math.random()*3;
+    particles.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd-1,life:1,col:cols[i%5]});
+  }
+}
+function cardBurst(x,y,col) {
+  for(let i=0;i<18;i++) {
+    const a=Math.random()*Math.PI*2,spd=1.5+Math.random()*4;
+    particles.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd-2,life:1,col});
+  }
+}
+function tickParticles() {
+  particles=particles.filter(p=>p.life>0);
+  for(const p of particles) {
+    p.x+=p.vx;p.y+=p.vy;p.vy+=0.18;p.life-=0.038;
+    ctx.globalAlpha=p.life;ctx.fillStyle=p.col;ctx.fillRect(p.x|0,p.y|0,4,4);
+  }
+  ctx.globalAlpha=1;
+}
+
+// ── Collision ────────────────────────────────────────
+function hits() {
+  const R=8;
+  if(bird.y+R>=GYL||bird.y-R<=0) return true;
+  for(const p of pipes) {
+    if(BX+R>p.x-3&&BX-R<p.x+PW+3) {
+      const gap=(BASE_PG*omenGapMult*relicGapMult)+(P.upgrades.wideGap*BASE_PG*0.15)+fx.gapBonus;
+      if(bird.y-R<p.topH||bird.y+R>p.topH+gap) return true;
+    }
+  }
+  return false;
+}
+
+// ── Pick pit stop cards ──────────────────────────────
+function pickCards() {
+  const pool=[...CARDS];
+  const numChoices = P.traits.pit_choice ? 4 : 3;
+  const picked=[];
+  // 33% chance one slot is a relic if we have room
+  const maxSlots = P.traits.relic_slot ? 3 : 2;
+  const offerRelic = runRelics.length < maxSlots && Math.random()<0.33;
+  const relicPool = RELICS.filter(r=>!runRelics.find(a=>a.id===r.id));
+  for(let i=0;i<numChoices&&pool.length;i++) {
+    if(i===0&&offerRelic&&relicPool.length>0) {
+      const ri=Math.floor(Math.random()*relicPool.length);
+      picked.push({...relicPool[ri], isRelic:true});
+    } else {
+      const idx=Math.floor(Math.random()*pool.length);
+      picked.push(pool.splice(idx,1)[0]);
+    }
+  }
+  return picked;
+}
+
+// ── Apply card ───────────────────────────────────────
+function applyCard(card) {
+  if(card.isRelic) { applyRelic(card); return; }
+  if(card.id==='ghost')      fx.ghost=2;
+  if(card.id==='shield')     fx.shield=3;
+  if(card.id==='widegap')    fx.gapBonus+=BASE_PG*0.4;
+  if(card.id==='slowtime')   fx.slowTimer=720;
+  if(card.id==='turboflap')  fx.turboTimer=600;
+  if(card.id==='doublebits') fx.doubleBitsTimer=900;
+  if(card.id==='extralife')  lives=Math.min(lives+1,6);
+  // echo_lens: apply same card again (once, no loop)
+  if(hasRelic('echo_lens') && lastCard && !card.isRelic) {
+    const prev=lastCard;
+    lastCard=card;
+    applyCard({...prev}); // apply previous card
+    return;
+  }
+  lastCard=card;
+  sfxPowerUp();
+  for(let i=0;i<18;i++) cardBurst(BX,bird.y,card.col||card.color);
+}
+
+// ── CRT scanlines ────────────────────────────────────
+function drawCRT() {
+  ctx.fillStyle='rgba(0,0,0,0.06)';
+  for(let y=0;y<H;y+=3) ctx.fillRect(0,y,W,1);
+}
+
+// ── Claw Voice bubble ─────────────────────────────────
+function drawClawVoice() {
+  if(!clawVoice || clawVoice.timer<=0) { clawVoice=null; return; }
+  clawVoice.timer--;
+  const a = clawVoice.timer<30 ? clawVoice.timer/30 : Math.min(1,(130-clawVoice.timer)/15);
+  ctx.globalAlpha=a;
+  ctx.fillStyle='#000000CC';
+  ctx.fillRect(8,52,W-16,20);
+  ctx.fillStyle='#FFFFFF44';
+  ctx.fillRect(8,52,W-16,1);
+  pt(clawVoice.text,W/2,65,5,'#FFFFFF');
+  ctx.globalAlpha=1;
+}
+
+// ── Draw: Panel ────────
+function drawPanel(x,y,w,h,bg,border) {
+  ctx.fillStyle=bg||'#081408'; ctx.fillRect(x,y,w,h);
+  ctx.fillStyle=border||'#00ff88';
+  ctx.fillRect(x,y,w,4);ctx.fillRect(x,y+h-4,w,4);
+  ctx.fillRect(x,y,4,h);ctx.fillRect(x+w-4,y,4,h);
+  ctx.fillStyle='#000';
+  ctx.fillRect(x,y,4,4);ctx.fillRect(x+w-4,y,4,4);
+  ctx.fillRect(x,y+h-4,4,4);ctx.fillRect(x+w-4,y+h-4,4,4);
+}
+
+// ── Button helper ────────────────────────────────────
+const BTN_RECTS = {};
+function drawBtn(id,label,x,y,w,h,col,active) {
+  BTN_RECTS[id]={x,y,w,h};
+  ctx.fillStyle=active?col:(col+'99');
+  ctx.fillRect(x,y,w,h);
+  ctx.fillStyle='#000a';
+  ctx.fillRect(x,y+h-3,w,3);
+  pt(label,x+w/2,y+h/2+3,6,active?'#000':'#000a');
+}
+function hitBtn(id) {
+  if(!tapPos) return false;
+  const r=BTN_RECTS[id];
+  if(!r) return false;
+  return tapPos.x>=r.x&&tapPos.x<=r.x+r.w&&tapPos.y>=r.y&&tapPos.y<=r.y+r.h;
+}
+
+// ── Tutorial ─────────────────────────────────────────
+const TUTORIAL_KEY = 'flappyClaw_tutDone';
+const TUTORIAL_SLIDES = [
+  {
+    title: 'TAP TO FLAP',
+    lines: ['Tap the screen','(or press SPACE)','to make Claw fly.','Dodge the pipes!'],
+    icon: '🦞',
+    color: '#00ff88',
+  },
+  {
+    title: 'LIVES',
+    lines: ['You have 3 lives.','Hit a pipe —','lose a life.','Lose all 3: GAME OVER.'],
+    icon: '❤️',
+    color: '#ff4444',
+  },
+  {
+    title: 'PIT STOPS',
+    lines: ['Every 25 pipes,','choose a power-up','card to help you','survive longer!'],
+    icon: '🛑',
+    color: '#ffd700',
+  },
+  {
+    title: 'BITS & SHOP',
+    lines: ['Earn BITS each pipe.','After game over,','spend them on','permanent upgrades!'],
+    icon: '💰',
+    color: '#ffd700',
+  },
+];
+let tutSlide=0, tutActive=false;
+
+function startTutorial() {
+  tutSlide=0; tutActive=true; state='tutorial';
+}
+function tutDone() {
+  localStorage.setItem(TUTORIAL_KEY,'1');
+  tutActive=false;
+  runOmen=rollOmen(); omenTimer=120; state='omenreveal';
+}
+
+function drawTutorial() {
+  drawSky(); drawGround(frame*0.5);
+  drawBird(W/2, H/2-140+Math.sin(frame*0.05)*5, 0, frame, false, P.equippedSkin);
+  ctx.fillStyle='rgba(0,0,0,0.82)'; ctx.fillRect(0,0,W,H);
+
+  const slide=TUTORIAL_SLIDES[tutSlide];
+  const pw=240, ph=210, px=W/2-pw/2, py=H/2-ph/2-10;
+  drawPanel(px,py,pw,ph,'#060c10',slide.color);
+
+  // progress dots
+  for(let i=0;i<TUTORIAL_SLIDES.length;i++) {
+    ctx.fillStyle=i===tutSlide?slide.color:'#333';
+    ctx.fillRect(W/2-TUTORIAL_SLIDES.length*7+i*14, py+8, 8, 8);
+  }
+
+  // icon
+  ctx.font='28px serif'; ctx.textAlign='center';
+  ctx.fillText(slide.icon, W/2, py+46);
+
+  // title
+  pts(slide.title, W/2, py+74, 8, slide.color);
+
+  // lines
+  slide.lines.forEach((l,i)=>pt(l, W/2, py+100+i*18, 6, '#ccc'));
+
+  // nav buttons
+  const isLast = tutSlide===TUTORIAL_SLIDES.length-1;
+  if(tutSlide>0) drawBtn('tutBack','< BACK', px+10, py+ph-32, 80, 24, '#555', true);
+  drawBtn('tutNext', isLast?'PLAY! >':'NEXT >', px+pw-90, py+ph-32, 80, 24, slide.color, true);
+
+  pt((tutSlide+1)+'/'+TUTORIAL_SLIDES.length, W/2, py+ph-18, 5, '#444');
+  drawCRT();
+
+  if(tapPos) {
+    if(hitBtn('tutNext')) {
+      if(isLast) { tutDone(); }
+      else { tutSlide++; }
+    } else if(tutSlide>0&&hitBtn('tutBack')) { tutSlide--; }
+    tapPos=null;
+  }
+}
+
+
+const homeScrollY = { v:0 };
+function drawHome() {
+  drawSky();
+  drawGround(frame*0.5);
+
+  const sk=SKINS[P.equippedSkin]||SKINS.default;
+  const by=H/2-110+Math.sin(frame*0.05)*6;
+  if(sk.glow) { ctx.shadowColor=sk.glow; ctx.shadowBlur=12; }
+  drawBird(W/2,by,0,frame,false,P.equippedSkin);
+  ctx.shadowBlur=0;
+
+  pts('FLAPPY',W/2,H/2-60,13,'#ff8040','#400000');
+  pts('CLAW',  W/2,H/2-40,13,'#ff4040','#400000');
+  pt('v2',W/2+52,H/2-38,6,'#ff404088');
+
+  // stats panel
+  const py=H/2-15, ph=72, pw=220, px=W/2-pw/2;
+  drawPanel(px,py,pw,ph,'#000d','#00ff88');
+  pt('LV '+P.level,  px+pw*0.18, py+18, 6, '#ffdd44');
+  pt('BEST',         px+pw*0.5,  py+14, 5, '#666');
+  pt(''+P.highScore, px+pw*0.5,  py+28, 8, '#fff');
+  pt('BITS',         px+pw*0.75, py+14, 5, '#666');
+  pt(''+P.bits,      px+pw*0.75, py+28, 8, '#ffd700');
+  pt('💎 '+P.shards, px+pw*0.97, py+14, 5, '#88DDFF', 'right');
+  pt('RUNS '+P.totalRuns, W/2, py+52, 5, '#555');
+
+  const xpNeed=xpToNext(P.level);
+  const xpFrac=Math.min(1,P.xp%xpNeed/xpNeed);
+  ctx.fillStyle='#111'; ctx.fillRect(px+8,py+60,pw-16,6);
+  ctx.fillStyle='#00ff88'; ctx.fillRect(px+8,py+60,Math.floor((pw-16)*xpFrac),6);
+
+  drawBtn('play','> PLAY <',W/2-60,H/2+66,120,28,'#00ff88',true);
+
+  const lockedSkins=SKIN_ORDER.filter(id=>id!=='default'&&!P.unlockedSkins.includes(id));
+  const nextUnlock=lockedSkins[0];
+  const nextSkin=SKINS[nextUnlock];
+  const skinY=H/2+102;
+  drawBtn('skin','SKIN: '+(sk.name.slice(0,6)),W/2-60,skinY,120,22,'#8888ff',true);
+  if(nextSkin) pt('LV'+nextSkin.unlockLv+' → '+nextSkin.name.slice(0,8),W/2,skinY+36,5,'#554');
+
+  drawBtn('shop','SHOP',W/2-66,H/2+142,60,18,'#ffd700',true);
+  drawBtn('forge','FORGE',W/2+6,H/2+142,60,18,'#88DDFF',true);
+  drawBtn('howto','? HOW TO PLAY',W/2-66,H/2+168,132,18,'#444',true);
+
+  drawCRT();
+
+  if(tapPos) {
+    if(hitBtn('play')) {
+      if(!localStorage.getItem(TUTORIAL_KEY)) { startTutorial(); }
+      else { runOmen=rollOmen(); omenTimer=120; state='omenreveal'; }
+    } else if(hitBtn('skin')) {
+      const unlocked=P.unlockedSkins;
+      const cur=unlocked.indexOf(P.equippedSkin);
+      P.equippedSkin=unlocked[(cur+1)%unlocked.length];
+      persist(P);
+    } else if(hitBtn('shop')) {
+      state='shop';
+    } else if(hitBtn('forge')) {
+      state='traitforge';
+    } else if(hitBtn('howto')) {
+      startTutorial();
+    }
+    tapPos=null;
+  }
+}
+
+// ── PLAYING ──────────────────────────────────────────
+function tickPlaying() {
+  const slow=fx.slowTimer>0?0.6:1;
+  const spd=(1.8+(runLevel-1)*0.12)*slow*omenSpeedMult*(hasRelic('hot_rod')?1.15:1);
+  gOff+=spd;
+  if(fx.slowTimer>0) fx.slowTimer--;
+  if(fx.turboTimer>0) fx.turboTimer--;
+  if(fx.doubleBitsTimer>0) fx.doubleBitsTimer--;
+
+  if(frame%PINT===0) {
+    const mn=55,mx=GYL-BASE_PG-55;
+    const nextPitPipe = Math.ceil((score+1)/PIT_INTERVAL)*PIT_INTERVAL;
+    const isPitPipe = (score + 1 + pipes.filter(p=>!p.scored).length) === nextPitPipe;
+    // chaos omen: wilder gap randomization
+    const chaosMod = (runOmen && runOmen.id==='chaos') ? (Math.random()-0.5)*60 : 0;
+    pipes.push({x:W+PW, topH:Math.max(mn,Math.min(mx,(mn+Math.random()*(mx-mn))+chaosMod)), scored:false, pitWarn:isPitPipe});
+  }
+
+  const fv=BASE_FLAPV*(1+(P.upgrades.flapBoost*0.15))*relicFlapMult*(fx.turboTimer>0?1.3:1);
+  bird.vy+=GRAV*omenGravMult*relicGravMult; bird.y+=bird.vy; bird.t++;
+  bird.angle=Math.min(Math.PI/3,Math.max(-Math.PI/5,bird.vy*0.09));
+
+  for(const p of pipes) {
+    p.x-=spd;
+    if(!p.scored&&p.x+PW<BX) {
+      p.scored=true; score++; runLvlPts++;
+      // bits calculation with omen/relic effects
+      let b = fx.doubleBitsTimer>0 ? 2 : 1;
+      if(hasRelic('hot_rod'))    b = Math.ceil(b*1.5);
+      if(hasRelic('lucky_wing') && Math.random()<0.25) b *= 3;
+      b *= omenBitsMult;
+      if(hasRelic('coin_press')) b += 2;
+      b = Math.ceil(b);
+      runBits+=b;
+      comboN++;comboT=55;
+      if(score>P.highScore) P.highScore=score;
+      if(runLvlPts>=10) { runLevel++;runLvlPts=0;lvlFlash=80; showClawVoice('LEVEL UP! LV '+runLevel); }
+      // score milestones
+      if(score===25)  showClawVoice('Quarter century.');
+      if(score===50)  showClawVoice('Halfway legend.');
+      if(score===100) showClawVoice('THREE DIGITS. LETS GO!');
+      sfxScore();
+      // windfall omen
+      if(runOmen && runOmen.id==='windfall' && score%10===0) { runBits+=10; }
+      // confetti on pit stop milestone
+      if(score%PIT_INTERVAL===0) {
+        const cols=['#ffd700','#ff80ff','#44ffee','#ff6040','#ffffff'];
+        for(let i=0;i<30;i++){
+          const a=Math.random()*Math.PI*2,spd2=2+Math.random()*5;
+          particles.push({x:BX,y:bird.y,vx:Math.cos(a)*spd2,vy:Math.sin(a)*spd2-3,life:1,col:cols[i%5]});
+        }
+        sfxPitScore();
+      }
+    }
+  }
+  pipes=pipes.filter(p=>p.x>-PW-10);
+  comboT=Math.max(0,comboT-1);
+  if(comboN>P.bestCombo) P.bestCombo=comboN;
+
+  // combo armor trait
+  if(P.traits.combo_armor && comboN>=8 && !fx.shield) { fx.shield=1; }
+
+  // pit stop — show card selection first, countdown after
+  if(score>0 && score%PIT_INTERVAL===0 && score!==lastPitScore) {
+    lastPitScore=score;
+    bird = { y:H/2-30, vy:0, angle:0, t:0 };
+    pipes = pipes.filter(p=>p.scored);
+    // ghost_mantle: auto-apply ghost at pit stop
+    if(hasRelic('ghost_mantle')) fx.ghost=2;
+    pitCards=pickCards(); pitTransTimer=PIT_TRANS_FRAMES;
+    showClawVoice(CLAW_PIT_LINES[Math.floor(Math.random()*CLAW_PIT_LINES.length)]);
+    state='pitstop'; pitPicked=false;
+    sfxPitOpen();
+    return;
+  }
+
+  if(hits()) {
+    if(fx.ghost>0) { fx.ghost--; return; }
+    if(fx.shield>0) { fx.shield--;
+      // shield_cloak: auto-regen shield on respawn
+      if(hasRelic('shield_cloak') && fx.shield===0) fx.shield=1;
+      return;
+    }
+    burst(BX,bird.y); sfxDie(); lives--;
+    if(lives>0) { dTimer=80; state='dying'; }
+    else { startGameOver(); }
+  }
+}
+
+function drawPlaying() {
+  drawSky();
+  const gap=(BASE_PG*omenGapMult*relicGapMult)+(P.upgrades.wideGap*BASE_PG*0.15)+fx.gapBonus;
+  for(const p of pipes) drawPipe(p.x,p.topH,p.topH+gap,p.pitWarn);
+  drawGround(gOff);
+  tickParticles();
+  drawBird(BX,bird.y|0,bird.angle,bird.t,false,P.equippedSkin);
+  const maxL=3+P.upgrades.extraLife+(P.traits.hardened||0);
+  drawHUD(score,runLevel,lives,runBits,maxL);
+  // pit stop countdown hint (last 5 pipes)
+  const toNext=PIT_INTERVAL-(score%PIT_INTERVAL);
+  if(toNext<=5&&toNext>0) {
+    const a=0.4+0.4*Math.abs(Math.sin(frame*0.2));
+    ctx.globalAlpha=a;
+    pt('🏁 PIT IN '+toNext,W/2,H-GH-14,6,'#ffd700');
+    ctx.globalAlpha=1;
+  }
+  // fx icons
+  let fxi=0;
+  if(fx.shield>0)  { pt('S×'+fx.shield,8+fxi*14,H-GH-8,6,'#4080ff'); fxi++; }
+  if(fx.ghost>0)   { pt('G',8+fxi*14,H-GH-8,6,'#a0a0ff'); fxi++; }
+  if(fx.slowTimer>0)  { pt('T',8+fxi*14,H-GH-8,6,'#ff80ff'); fxi++; }
+  if(fx.turboTimer>0) { pt('F',8+fxi*14,H-GH-8,6,'#ff8040'); fxi++; }
+  if(fx.doubleBitsTimer>0) { pt('$',8+fxi*14,H-GH-8,6,'#ffd700'); fxi++; }
+  // relic icons (bottom right)
+  if(runRelics.length>0) {
+    ctx.font='10px serif'; ctx.textAlign='right';
+    runRelics.forEach((r,i)=>ctx.fillText(r.icon, W-6, H-GH-8-i*14));
+    ctx.textAlign='center';
+  }
+  // omen tint indicator (small text, top right)
+  if(runOmen && runOmen.id!=='none') {
+    ctx.globalAlpha=0.55;
+    pt(runOmen.icon,W-10,12,8,'#fff','right');
+    ctx.globalAlpha=1;
+  }
+  // Claw Voice bubble
+  drawClawVoice();
+  drawCRT();
+}
+
+// ── PIT COUNTDOWN ──────────────────────────────────
+function tickPitCountdown() {
+  pitCountTimer--;
+  // bird hovers gently — no gravity, no pipes
+  bird.y = H/2-30 + Math.sin(frame*0.04)*8;
+  bird.angle=0;
+  bird.t++;
+  gOff+=0.3;
+
+  const n = Math.ceil(pitCountTimer / (PIT_COUNT_FRAMES/3)); // 3→1
+  const prev = Math.ceil((pitCountTimer+1) / (PIT_COUNT_FRAMES/3));
+  if(n !== prev) sfxCountdown(n);
+
+  if(pitCountTimer<=0) {
+    // done — launch back into playing
+    bird = { y:H/2-30, vy:-1.5, angle:0, t:0 };
+    state='playing'; pitPicked=true;
+  }
+}
+
+function drawPitCountdown() {
+  drawSky();
+  const gap=(BASE_PG*omenGapMult*relicGapMult)+(P.upgrades.wideGap*BASE_PG*0.15)+fx.gapBonus;
+  for(const p of pipes) drawPipe(p.x,p.topH,p.topH+gap,p.pitWarn);
+  drawGround(gOff);
+  tickParticles();
+  drawBird(BX,bird.y|0,0,bird.t,false,P.equippedSkin);
+  const maxL=3+P.upgrades.extraLife+(P.traits.hardened||0);
+  drawHUD(score,runLevel,lives,runBits,maxL);
+
+  // countdown number
+  const n = Math.ceil(pitCountTimer / (PIT_COUNT_FRAMES/3));
+  const prog = 1 - (pitCountTimer % (PIT_COUNT_FRAMES/3)) / (PIT_COUNT_FRAMES/3);
+  const sz = 8+Math.floor((1-prog)*8); // scales up as it appears
+  ctx.globalAlpha = Math.min(1, (1-prog)*2);
+  const label = n>0 ? ''+n : 'GO!';
+  const col = n>0 ? '#ffd700' : '#00ff88';
+  pts(label, W/2, H/2-20, sz+10, col);
+  ctx.globalAlpha=1;
+
+  // "PIT STOP" banner fades in
+  ctx.globalAlpha=Math.min(1,(1-pitCountTimer/PIT_COUNT_FRAMES)*2);
+  pt('PIT STOP INCOMING',W/2,H/2+20,5,'#ffd700aa');
+  ctx.globalAlpha=1;
+  drawCRT();
+}
+
+// ── PIT STOP (animated) ────────────────────────────────
+function drawPitStop() {
+  if(pitTransTimer>0) pitTransTimer--;
+  const prog=1-(pitTransTimer/PIT_TRANS_FRAMES);
+
+  drawSky();
+  const gap=(BASE_PG*omenGapMult*relicGapMult)+(P.upgrades.wideGap*BASE_PG*0.15)+fx.gapBonus;
+  for(const p of pipes) drawPipe(p.x,p.topH,p.topH+gap,p.pitWarn);
+  drawGround(gOff);
+  drawBird(BX,bird.y|0,0,bird.t,false,P.equippedSkin);
+  tickParticles();
+
+  const alpha=Math.min(0.82, prog*0.82);
+  ctx.fillStyle=`rgba(0,0,0,${alpha})`; ctx.fillRect(0,0,W,H);
+
+  const slideOff=(1-prog)*H*0.55;
+  ctx.save();
+  ctx.translate(0, slideOff);
+
+  if(prog>0.4) {
+    const flashA=Math.min(1,(prog-0.4)/0.3);
+    ctx.globalAlpha=flashA;
+    ctx.fillStyle='rgba(255,215,0,0.12)'; ctx.fillRect(0,36,W,32);
+    pts('🏁 PIT STOP',W/2,54,10,'#ffd700');
+    pt('SCORE: '+score,W/2,70,6,'#aaa');
+    ctx.globalAlpha=1;
+  }
+
+  const numCards=pitCards.length;
+  const cw=numCards===4?66:78, ch=98, gap2=numCards===4?5:7;
+  const startX=(W-(cw*numCards+gap2*(numCards-1)))/2;
+  const cardY=84;
+  const CARD_RECTS=[];
+  for(let i=0;i<pitCards.length;i++) {
+    const c=pitCards[i];
+    const cx2=startX+i*(cw+gap2);
+    const cardAlpha=prog>0.25?Math.min(1,(prog-0.25-i*0.06)/0.25):0;
+    ctx.globalAlpha=cardAlpha;
+    CARD_RECTS.push({x:cx2,y:cardY,w:cw,h:ch,card:c});
+
+    const col=c.isRelic?c.color:(c.col||'#fff');
+    ctx.shadowColor=col; ctx.shadowBlur=10;
+    drawPanel(cx2,cardY,cw,ch,c.isRelic?'#0a0c18':'#0a0a1c',col);
+    ctx.shadowBlur=0;
+
+    if(c.isRelic) {
+      pt('RELIC',cx2+cw/2,cardY+10,4,'#ffffff66');
+    }
+    ctx.font='18px serif'; ctx.textAlign='center';
+    ctx.fillText(c.icon||c.icon, cx2+cw/2, cardY+(c.isRelic?28:28));
+
+    const words=(c.name||'').split(' ');
+    words.forEach((w,wi)=>pt(w,cx2+cw/2,cardY+42+wi*12,5,col));
+
+    const dlines=(c.isRelic?c.desc:c.desc).split('/');
+    dlines.forEach((dl,di)=>pt(dl.trim(),cx2+cw/2,cardY+68+di*10,4,'#888'));
+
+    ctx.globalAlpha=1;
+    ctx.shadowBlur=0;
+  }
+
+  // omen reroll button (if trait owned and not used)
+  if(P.traits.omen_sight && !omenRerollUsed && runOmen) {
+    ctx.globalAlpha=prog>0.7?Math.min(1,(prog-0.7)/0.2):0;
+    drawBtn('omenreroll','REROLL OMEN',W/2-46,cardY+ch+32,92,18,'#8855ff',true);
+    ctx.globalAlpha=1;
+  }
+
+  ctx.globalAlpha=prog>0.7?Math.min(1,(prog-0.7)/0.2):0;
+  drawBtn('pitskip','SKIP',W/2-32,cardY+ch+10,64,20,'#555',true);
+  ctx.globalAlpha=1;
+
+  ctx.restore();
+  drawClawVoice();
+  drawCRT();
+
+  if(pitTransTimer>0||!tapPos) { tapPos=null; return; }
+
+  let picked=false;
+  for(const r of CARD_RECTS) {
+    if(tapPos.x>=r.x&&tapPos.x<=r.x+r.w&&tapPos.y>=r.y&&tapPos.y<=r.y+r.h) {
+      cardBurst(r.x+r.w/2, r.y+r.h/2, r.card.col||r.card.color||'#fff');
+      applyCard(r.card); picked=true; break;
+    }
+  }
+  if(!picked&&hitBtn('pitskip')) picked=true;
+  if(!picked&&hitBtn('omenreroll')&&!omenRerollUsed) {
+    runOmen=rollOmen(); applyOmen(runOmen); omenRerollUsed=true;
+    showClawVoice('Omen rerolled: '+runOmen.name);
+    tapPos=null; return;
+  }
+  if(picked) {
+    pitCountTimer=PIT_COUNT_FRAMES;
+    state='pitcountdown';
+  }
+  tapPos=null;
+}
+
+// ── DYING ────────────────────────────────────────────
+function tickDying() {
+  dTimer--;
+  gOff+=0.4;
+  bird.vy+=GRAV; bird.y=Math.min(bird.y+bird.vy,GYL-10);
+  if(dTimer<=0) { respawn(); state='playing'; }
+}
+function drawDying() {
+  drawSky();
+  const gap=(BASE_PG*omenGapMult*relicGapMult)+(P.upgrades.wideGap*BASE_PG*0.15)+fx.gapBonus;
+  for(const p of pipes) drawPipe(p.x,p.topH,p.topH+gap,p.pitWarn);
+  drawGround(gOff);
+  tickParticles();
+  drawBird(BX,bird.y|0,Math.PI/2,bird.t,true,P.equippedSkin);
+  ctx.fillStyle='rgba(255,40,40,0.2)'; ctx.fillRect(0,0,W,GYL);
+  const maxL=3+P.upgrades.extraLife+(P.traits.hardened||0);
+  drawHUD(score,runLevel,lives,runBits,maxL);
+  const prog=1-(dTimer/80);
+  if(prog>0.3) {
+    ctx.globalAlpha=Math.min(1,(prog-0.3)/0.4);
+    pts('LIFE LOST!',W/2,H/2-10,10,'#ff4444');
+    pt(lives+' LEFT',W/2,H/2+14,8,'#ffaa44');
+    ctx.globalAlpha=1;
+  }
+  drawCRT();
+}
+
+// ── OVER GAME ─────
+function startGameOver() {
+  // v2: calculate shards earned
+  let shards = Math.floor(score/5)+1;
+  const echoLevel = P.traits.shard_echo||0;
+  if(echoLevel>0) shards = Math.ceil(shards*(1+echoLevel*0.3));
+  shardsEarned = shards;
+  P.shards = (P.shards||0) + shards;
+  // show death voice line
+  showClawVoice(CLAW_DEATH_LINES[Math.floor(Math.random()*CLAW_DEATH_LINES.length)]);
+
+  goXpBefore=P.xp; goRunBits=runBits;
+  const xpGain=Math.floor(score*10*(1+P.upgrades.xpBoost*0.25));
+  P.xp+=xpGain; goXpGain=xpGain;
+  P.bits+=runBits; P.totalRuns++;
+  goNewLevel=false; goNewSkins=[];
+  while(P.xp>=xpToNext(P.level)) {
+    P.xp-=xpToNext(P.level); P.level++; goNewLevel=true;
+    SKIN_ORDER.forEach(sid=>{
+      const sk=SKINS[sid];
+      if(sk.unlockLv&&P.level>=sk.unlockLv&&!P.unlockedSkins.includes(sid)) {
+        P.unlockedSkins.push(sid); goNewSkins.push(sid);
+      }
+    });
+  }
+  persist(P);
+  dTimer=90; goTimer=0; goCanInput=false;
+  state='gameover';
+}
+
+function drawGameOver() {
+  drawSky(); drawGround(gOff);
+  drawBird(BX,Math.min(bird.y+goTimer*1.5,GYL-10)|0,Math.PI/2,0,true,P.equippedSkin);
+  ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(0,0,W,H);
+
+  const PNW=220,PNH=240,px=W/2-PNW/2,py=H/2-PNH/2-10;
+  drawPanel(px,py,PNW,PNH,'#060c06','#00ff88');
+
+  pts('GAME OVER',W/2,py+24,10,'#ff4444','#220000');
+  ctx.fillStyle='#00ff8830'; ctx.fillRect(px+10,py+34,PNW-20,2);
+
+  pt('SCORE',W/2-50,py+50,5,'#666');
+  pt('BEST', W/2+50,py+50,5,'#666');
+  pts(''+score,     W/2-50,py+72,12,'#00ff88');
+  pts(''+P.highScore,W/2+50,py+72,12,'#ffdd44');
+
+  ctx.fillStyle='#00ff8830'; ctx.fillRect(px+10,py+86,PNW-20,2);
+
+  // bits + shards earned
+  pts('+'+goRunBits+' BITS',W/2-30,py+104,8,'#ffd700');
+  pts('+'+shardsEarned+' 💎',W/2+60,py+104,7,'#88DDFF');
+
+  // XP bar
+  const xpNeed=xpToNext(P.level);
+  const xpFrac=Math.min(1,P.xp/xpNeed);
+  pt('XP',px+20,py+122,5,'#555','left');
+  ctx.fillStyle='#111'; ctx.fillRect(px+36,py+115,PNW-52,8);
+  const barW=Math.floor((PNW-52)*xpFrac);
+  ctx.fillStyle='#00ff88'; ctx.fillRect(px+36,py+115,barW,8);
+  pt('+'+goXpGain,px+PNW-14,py+122,5,'#00ff8880','right');
+
+  if(goNewLevel) pts('LEVEL UP! LV'+P.level,W/2,py+140,7,'#ffdd44');
+  else pt('LV '+P.level,W/2,py+140,6,'#888');
+
+  if(goNewSkins.length>0) pt('UNLOCKED: '+(SKINS[goNewSkins[0]].name.slice(0,8)),W/2,py+156,5,'#ffd700');
+
+  const RANKS=[[40,'S','#ff8040'],[25,'A','#ffd700'],[10,'B','#c0c0c0'],[3,'C','#cd7f32'],[0,'D','#666']];
+  const [,rk,rc]=RANKS.find(([m])=>score>=m);
+  pts('['+rk+']',W/2,py+174,9,rc);
+
+  if(score>=P.highScore&&score>0) pts('NEW BEST!',W/2,py+192,6,'#ffdd44','#442200');
+
+  // omen used this run
+  if(runOmen && runOmen.id!=='none') {
+    pt(runOmen.icon+' '+runOmen.name,W/2,py+208,5,'#aaaaff');
+  }
+
+  if(goCanInput) {
+    drawBtn('goShop','SHOP',px+8,py+PNH+4,56,24,'#ffd700',true);
+    drawBtn('goForge','FORGE',px+PNW/2-28,py+PNH+4,56,24,'#88DDFF',true);
+    drawBtn('goPlay','RETRY',px+PNW-64,py+PNH+4,56,24,'#00ff88',true);
+  } else {
+    const dots='.'.repeat(1+Math.floor((90-dTimer)/30)%3);
+    pt(dots,W/2,py+PNH+18,10,'#333');
+  }
+  drawClawVoice();
+  drawCRT();
+
+  if(tapPos&&goCanInput) {
+    if(hitBtn('goShop'))   { state='shop'; tapPos=null; }
+    else if(hitBtn('goForge'))  { state='traitforge'; tapPos=null; }
+    else if(hitBtn('goPlay'))   { runOmen=rollOmen(); omenTimer=120; state='omenreveal'; tapPos=null; }
+    else tapPos=null;
+  } else tapPos=null;
+}
+
+// ── OMEN REVEAL ──────────────────────────────────────
+function drawOmenReveal() {
+  omenTimer--;
+  const o = runOmen || OMENS[OMENS.length-1];
+  ctx.fillStyle='#000011'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=o.color+'18'; ctx.fillRect(0,0,W,H);
+  const pulse=0.7+0.3*Math.sin(Date.now()/300);
+  ctx.shadowColor=o.color; ctx.shadowBlur=20*pulse;
+  pt('-- WORLD OMEN --',W/2,H*0.18,5,'#FFFFFF55');
+  ctx.shadowBlur=0;
+  ctx.font='38px serif'; ctx.textAlign='center';
+  ctx.fillText(o.icon,W/2,H*0.35);
+  pts(o.name,W/2,H*0.49,9,o.color);
+  pt(o.effect,W/2,H*0.60,5,'#CCCCCC');
+  pt(o.voice,W/2,H*0.72,5,'#FFFFFF88');
+  const prog=1-(omenTimer/120);
+  ctx.fillStyle=o.color+'AA';
+  ctx.fillRect(0,H-5,W*prog,5);
+  ctx.shadowBlur=0;
+  drawCRT();
+  if(omenTimer<=0) {
+    showClawVoice(o.voice);
+    pickRelicChoices();
+    state='relicpick';
+  }
+}
+
+// ── RELIC PICK ────────────────────────────────────────
+function drawRelicPick() {
+  drawSky(); drawGround(frame*0.3);
+  ctx.fillStyle='rgba(0,0,0,0.88)'; ctx.fillRect(0,0,W,H);
+  pts('CHOOSE A RELIC',W/2,38,8,'#CCAAFF');
+  pt('persists the full run',W/2,54,5,'#666');
+
+  const cw=78,ch=106,gap=7,startX=(W-(cw*3+gap*2))/2;
+  const cardY=66;
+  const RECTS=[];
+  for(let i=0;i<relicChoices.length;i++) {
+    const r=relicChoices[i];
+    const cx2=startX+i*(cw+gap);
+    RECTS.push({x:cx2,y:cardY,w:cw,h:ch,relic:r});
+    ctx.shadowColor=r.color; ctx.shadowBlur=10;
+    drawPanel(cx2,cardY,cw,ch,'#0a0a1c',r.color);
+    ctx.shadowBlur=0;
+    ctx.font='18px serif'; ctx.textAlign='center';
+    ctx.fillText(r.icon,cx2+cw/2,cardY+24);
+    const words=r.name.split(' ');
+    words.forEach((w,wi)=>pt(w,cx2+cw/2,cardY+38+wi*12,5,r.color));
+    pt(r.desc,cx2+cw/2,cardY+68,4,'#888');
+    pt(r.flavor.replace(/"/g,''),cx2+cw/2,cardY+82,3,'#555');
+    ctx.globalAlpha=1; ctx.shadowBlur=0;
+  }
+  drawBtn('relicskip','SKIP',W/2-28,cardY+ch+10,56,18,'#444',true);
+  drawClawVoice();
+  drawCRT();
+
+  if(!tapPos) return;
+  let picked=false;
+  for(const r of RECTS) {
+    if(tapPos.x>=r.x&&tapPos.x<=r.x+r.w&&tapPos.y>=r.y&&tapPos.y<=r.y+r.h) {
+      applyRelic(r.relic); picked=true; break;
+    }
+  }
+  if(!picked&&hitBtn('relicskip')) picked=true;
+  if(picked) {
+    newRun();
+    bird.vy=BASE_FLAPV;
+    state='playing';
+  }
+  tapPos=null;
+}
+
+// ── TRAIT FORGE ────────────────────────────────────────
+function drawTraitForge() {
+  drawSky(); drawGround(0);
+  ctx.fillStyle='rgba(0,0,0,0.9)'; ctx.fillRect(0,0,W,H);
+  pts('TRAIT FORGE',W/2,28,9,'#88DDFF');
+  pts('💎 '+P.shards+' SHARDS',W/2,48,7,'#88DDFF');
+  ctx.fillStyle='#88DDFF30'; ctx.fillRect(20,56,W-40,2);
+
+  TRAITS.forEach((trait,i)=>{
+    const iy=64+i*44;
+    const owned=P.traits[trait.id]||0;
+    const maxed=owned>=trait.max;
+    const canBuy=!maxed&&(P.shards||0)>=trait.cost;
+    const bg=maxed?'#08100c':(canBuy?'#080e14':'#0d0a04');
+    const border=maxed?'#88DDFF50':(canBuy?'#88DDFF':'#445');
+    drawPanel(16,iy,W-32,36,bg,border);
+    ctx.font='12px serif'; ctx.textAlign='left';
+    ctx.fillText(trait.icon,24,iy+22);
+    pt(trait.name,66,iy+13,5,canBuy?'#fff':'#666','left');
+    pt(trait.desc,66,iy+26,4,canBuy?'#888':'#444','left');
+    pt(owned+'/'+trait.max,W-52,iy+13,5,'#555','left');
+    if(maxed) { drawBtn('tbuy'+i,'MAX',W-42,iy+8,28,20,'#222',false); }
+    else { drawBtn('tbuy'+i,trait.cost+'S',W-42,iy+8,28,20,canBuy?'#88DDFF':'#333',canBuy); }
+  });
+
+  drawBtn('forgeback','< BACK',W/2-36,H-GH-36,72,24,'#888',true);
+  drawCRT();
+
+  if(tapPos) {
+    TRAITS.forEach((trait,i)=>{
+      if(hitBtn('tbuy'+i)) {
+        const owned=P.traits[trait.id]||0;
+        if(owned<trait.max&&(P.shards||0)>=trait.cost) {
+          P.shards-=trait.cost;
+          P.traits[trait.id]=(owned+1);
+          persist(P);
+        }
+      }
+    });
+    if(hitBtn('forgeback')) { state='home'; }
+    tapPos=null;
+  }
+}
+
+// ── SHOP ────────────────────────────────────────────
+function drawShop() {
+  drawSky(); drawGround(0);
+  ctx.fillStyle='rgba(0,0,0,0.85)'; ctx.fillRect(0,0,W,H);
+
+  pts('UPGRADE SHOP',W/2,36,9,'#ffd700');
+  pts('BITS: '+P.bits,W/2,56,7,'#ffd700');
+  ctx.fillStyle='#ffd70030'; ctx.fillRect(20,62,W-40,2);
+
+  SHOP_ITEMS.forEach((item,i)=>{
+    const iy=74+i*52;
+    const owned=P.upgrades[item.id]||0;
+    const maxed=owned>=item.max;
+    const canBuy=!maxed&&P.bits>=item.cost;
+    const bg=maxed?'#101808':(canBuy?'#081408':'#0d0a04');
+    const border=maxed?'#00ff8860':(canBuy?'#00ff88':'#554');
+    drawPanel(16,iy,W-32,44,bg,border);
+    pt(item.name,68,iy+14,6,canBuy?'#fff':'#666','left');
+    pt(item.desc,68,iy+28,5,canBuy?'#888':'#444','left');
+    pt(owned+'/'+item.max,W-56,iy+14,5,'#555','left');
+    if(maxed) { drawBtn('buy'+i,'MAX',W-42,iy+10,28,20,'#222',false); }
+    else { drawBtn('buy'+i,item.cost+'B',W-42,iy+10,28,20,canBuy?'#ffd700':'#333',canBuy); }
+  });
+
+  drawBtn('shopback','< BACK',W/2-36,H-GH-36,72,24,'#888',true);
+  drawCRT();
+
+  if(tapPos) {
+    SHOP_ITEMS.forEach((item,i)=>{
+      if(hitBtn('buy'+i)) {
+        const owned=P.upgrades[item.id]||0;
+        if(owned<item.max&&P.bits>=item.cost) {
+          P.bits-=item.cost; P.upgrades[item.id]=(owned+1); persist(P);
+        }
+      }
+    });
+    if(hitBtn('shopback')) { state='home'; }
+    tapPos=null;
+  }
+}
+
+// ── INPUT ────────────────────────────────────────────
+let lastTap=0;
+let rawTapPos=null;
+function onTap(lx,ly) {
+  const now=Date.now();
+  if(now-lastTap<100) return;
+  lastTap=now;
+  tapPos={x:lx,y:ly};
+  if(state==='playing') { bird.vy=BASE_FLAPV*(1+(P.upgrades.flapBoost*0.15))*(fx.turboTimer>0?1.3:1); sfxFlap(); }
+  if(state==='dying')   {}
+}
+canvas.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  const r=canvas.getBoundingClientRect();
+  const t=e.changedTouches[0];
+  onTap((t.clientX-r.left)/scale,(t.clientY-r.top)/scale);
+},{passive:false});
+canvas.addEventListener('mousedown',e=>{
+  if(e.button!==0) return;
+  const r=canvas.getBoundingClientRect();
+  onTap((e.clientX-r.left)/scale,(e.clientY-r.top)/scale);
+});
+document.addEventListener('keydown',e=>{
+  if(['Space','ArrowUp','KeyW'].includes(e.code)) { e.preventDefault(); onTap(W/2,H/2); }
+});
+
+// ── MAIN LOOP ────────────────────────────────────────
+function loop() {
+  frame++;
+  if(state==='playing')       { tickPlaying(); drawPlaying(); }
+  else if(state==='pitcountdown') { tickPitCountdown(); drawPitCountdown(); }
+  else if(state==='pitstop')  { drawPitStop(); }
+  else if(state==='dying')    { tickDying();  drawDying();  }
+  else if(state==='gameover'){
+    goTimer++;
+    dTimer=Math.max(0,dTimer-1);
+    if(dTimer<=0) goCanInput=true;
+    gOff+=0.2;
+    drawGameOver();
+  }
+  else if(state==='home')       { frame++; drawHome(); }
+  else if(state==='tutorial')   { frame++; drawTutorial(); }
+  else if(state==='shop')       { drawShop(); }
+  else if(state==='omenreveal') { frame++; drawOmenReveal(); }
+  else if(state==='relicpick')  { frame++; drawRelicPick(); }
+  else if(state==='traitforge') { drawTraitForge(); }
+  requestAnimationFrame(loop);
+}
+
+// Start loop — fonts.ready with 1s timeout fallback for mobile Safari
+let _started=false;
+function _start(){if(!_started){_started=true;requestAnimationFrame(loop);}}
+document.fonts.ready.then(_start);
+setTimeout(_start,1000);
+</script>
+</body>
+</html>

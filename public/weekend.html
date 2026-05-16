@@ -189,6 +189,95 @@
       overflow: hidden;
     }
 
+    /* SVG deco layer — sits behind content */
+    .task-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: var(--card-bg-svg, none);
+      background-repeat: no-repeat;
+      background-position: bottom right;
+      background-size: 80px 80px;
+      opacity: 0.07;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* All content above the deco layer */
+    .task-card > * { position: relative; z-index: 1; }
+
+    /* Per-card SVG motifs */
+    /* 🏖️ Beach / walk — wave pattern */
+    .bg-wave::after {
+      --card-bg-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M0 60 Q15 40 30 60 Q45 80 60 60 Q75 40 90 60 Q95 67 100 60' fill='none' stroke='%2387ceeb' stroke-width='4'/%3E%3Cpath d='M0 75 Q15 55 30 75 Q45 95 60 75 Q75 55 90 75 Q95 82 100 75' fill='none' stroke='%2387ceeb' stroke-width='3' opacity='0.6'/%3E%3Ccircle cx='70' cy='25' r='18' fill='%23ffe066' opacity='0.5'/%3E%3C/svg%3E");
+      background-size: 110px 110px;
+      background-position: bottom right;
+      opacity: 0.12;
+    }
+
+    /* 🧹 Clean — sparkle / stars pattern */
+    .bg-sparkle::after {
+      --card-bg-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 10 L53 44 L87 47 L53 50 L50 84 L47 50 L13 47 L47 44Z' fill='%23a8d5a2' opacity='0.8'/%3E%3Cpath d='M80 5 L81 18 L94 19 L81 20 L80 33 L79 20 L66 19 L79 18Z' fill='%23ffe066' opacity='0.7'/%3E%3Ccircle cx='20' cy='80' r='3' fill='%23a8d5a2'/%3E%3Ccircle cx='90' cy='70' r='2' fill='%23ffe066'/%3E%3C/svg%3E");
+      background-size: 90px 90px;
+      opacity: 0.10;
+    }
+
+    /* 🌿 Leaf / nature / reset */
+    .bg-leaf::after {
+      --card-bg-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cellipse cx='65' cy='55' rx='28' ry='18' fill='%237bc67e' opacity='0.6' transform='rotate(-30 65 55)'/%3E%3Cline x1='65' y1='37' x2='65' y2='73' stroke='%23a8d5a2' stroke-width='2'/%3E%3Cline x1='65' y1='50' x2='78' y2='43' stroke='%23a8d5a2' stroke-width='1.5'/%3E%3Cline x1='65' y1='58' x2='52' y2='65' stroke='%23a8d5a2' stroke-width='1.5'/%3E%3Cellipse cx='25' cy='80' rx='16' ry='10' fill='%237bc67e' opacity='0.4' transform='rotate(-15 25 80)'/%3E%3C/svg%3E");
+      background-size: 100px 100px;
+      opacity: 0.10;
+    }
+
+    /* ⚡ Build / deep work — lightning grid */
+    .bg-bolt::after {
+      --card-bg-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='60,5 45,45 58,45 40,95 75,40 58,40 72,5' fill='%23ffe066' opacity='0.7'/%3E%3Ccircle cx='20' cy='30' r='3' fill='%23ffe066' opacity='0.4'/%3E%3Ccircle cx='85' cy='80' r='4' fill='%23ffe066' opacity='0.3'/%3E%3Ccircle cx='15' cy='75' r='2' fill='%23ffe066' opacity='0.3'/%3E%3C/svg%3E");
+      background-size: 90px 90px;
+      opacity: 0.10;
+    }
+
+    /* 🎮 Game time — controller */
+    .bg-game::after {
+      --card-bg-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='20' y='35' width='60' height='35' rx='17' fill='%2387ceeb' opacity='0.5'/%3E%3Crect x='30' y='50' width='8' height='3' rx='1' fill='%23fff' opacity='0.8'/%3E%3Crect x='35' y='45' width='3' height='8' rx='1' fill='%23fff' opacity='0.8'/%3E%3Ccircle cx='63' cy='47' r='3' fill='%23ffb3c6' opacity='0.8'/%3E%3Ccircle cx='70' cy='52' r='3' fill='%23ffe066' opacity='0.8'/%3E%3Ccircle cx='63' cy='57' r='3' fill='%237bc67e' opacity='0.8'/%3E%3C/svg%3E");
+      background-size: 110px 110px;
+      opacity: 0.10;
+    }
+
+    /* 💰 Finance / HYSA — coins */
+    .bg-coin::after {
+      --card-bg-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='65' cy='50' r='28' fill='%23ffe066' opacity='0.5'/%3E%3Ccircle cx='65' cy='50' r='22' fill='none' stroke='%23ffe066' stroke-width='2' opacity='0.7'/%3E%3Ctext x='58' y='56' font-size='22' fill='%23ffe066' opacity='0.8' font-family='sans-serif' font-weight='bold'%3E%24%3C/text%3E%3Ccircle cx='22' cy='72' r='14' fill='%23ffe066' opacity='0.3'/%3E%3C/svg%3E");
+      background-size: 100px 100px;
+      opacity: 0.10;
+    }
+
+    /* 📊 Q2 / compass — map marker */
+    .bg-map::after {
+      --card-bg-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M55 20 C55 20 75 38 75 55 C75 65 66 74 55 74 C44 74 35 65 35 55 C35 38 55 20 55 20Z' fill='%23c9b8f0' opacity='0.5'/%3E%3Ccircle cx='55' cy='55' r='8' fill='%23c9b8f0' opacity='0.8'/%3E%3Cline x1='55' y1='10' x2='55' y2='20' stroke='%23c9b8f0' stroke-width='2'/%3E%3Cline x1='55' y1='74' x2='55' y2='85' stroke='%23c9b8f0' stroke-width='2'/%3E%3Cline x1='20' y1='55' x2='35' y2='55' stroke='%23c9b8f0' stroke-width='2'/%3E%3Cline x1='75' y1='55' x2='90' y2='55' stroke='%23c9b8f0' stroke-width='2'/%3E%3C/svg%3E");
+      background-size: 100px 100px;
+      opacity: 0.10;
+    }
+
+    /* 🌙 Night ritual / reflect — moon + stars */
+    .bg-moon::after {
+      --card-bg-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M60 20 A28 28 0 1 0 60 76 A18 18 0 1 1 60 20Z' fill='%23c9b8f0' opacity='0.6'/%3E%3Ccircle cx='28' cy='25' r='2' fill='%23ffe066' opacity='0.8'/%3E%3Ccircle cx='82' cy='18' r='1.5' fill='%23ffe066' opacity='0.7'/%3E%3Ccircle cx='20' cy='60' r='2.5' fill='%23ffe066' opacity='0.6'/%3E%3Ccircle cx='90' cy='70' r='1.5' fill='%23ffe066' opacity='0.5'/%3E%3Ccircle cx='35' cy='85' r='2' fill='%23ffe066' opacity='0.6'/%3E%3C/svg%3E");
+      background-size: 100px 100px;
+      opacity: 0.12;
+    }
+
+    /* 🎌 JP / build — torii gate silhouette */
+    .bg-torii::after {
+      --card-bg-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='40' y='25' width='4' height='60' fill='%23ff8c69' opacity='0.6'/%3E%3Crect x='56' y='25' width='4' height='60' fill='%23ff8c69' opacity='0.6'/%3E%3Crect x='32' y='30' width='36' height='5' rx='2' fill='%23ff8c69' opacity='0.7'/%3E%3Crect x='35' y='40' width='30' height='4' rx='2' fill='%23ff8c69' opacity='0.5'/%3E%3Ccircle cx='22' cy='55' r='8' fill='%23ffe066' opacity='0.15'/%3E%3C/svg%3E");
+      background-size: 100px 100px;
+      opacity: 0.10;
+    }
+
+    /* 📓 Reflect / journal — notebook lines */
+    .bg-journal::after {
+      --card-bg-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='25' y='15' width='55' height='70' rx='4' fill='%23a8d5a2' opacity='0.25'/%3E%3Crect x='30' y='15' width='5' height='70' rx='2' fill='%237bc67e' opacity='0.35'/%3E%3Cline x1='38' y1='32' x2='72' y2='32' stroke='%23a8d5a2' stroke-width='2' opacity='0.6'/%3E%3Cline x1='38' y1='44' x2='72' y2='44' stroke='%23a8d5a2' stroke-width='2' opacity='0.5'/%3E%3Cline x1='38' y1='56' x2='72' y2='56' stroke='%23a8d5a2' stroke-width='2' opacity='0.4'/%3E%3Cline x1='38' y1='68' x2='60' y2='68' stroke='%23a8d5a2' stroke-width='2' opacity='0.3'/%3E%3C/svg%3E");
+      background-size: 100px 100px;
+      opacity: 0.12;
+    }
+
     .task-card::before {
       content: '';
       position: absolute;
@@ -197,6 +286,7 @@
       border-radius: 14px 14px 0 0;
       background: var(--accent-color, var(--island-green));
       opacity: 0.6;
+      z-index: 1;
     }
 
     .task-card:hover {
@@ -533,12 +623,7 @@
 
       <div class="section-label">🌅 morning</div>
 
-      <div class="task-card c-green" onclick="toggleTask(this)">
-        <div class="task-header">
-          <div class="task-check"></div>
-          <div class="task-info">
-            <div class="task-time">Morning</div>
-            <div class="task-title">Beach Walk + Coffee ☕️</div>
+      <div class="task-card c-green bg-wave" onclick="toggleTask(this)">
             <div class="task-sub">Sand, air, hot cup. Best way to start a Saturday.</div>
           </div>
           <div class="task-emoji">🌊</div>
@@ -549,7 +634,7 @@
         </div>
       </div>
 
-      <div class="task-card c-sage" onclick="toggleTask(this)">
+      <div class="task-card c-sage bg-sparkle" onclick="toggleTask(this)">
         <div class="task-header">
           <div class="task-check"></div>
           <div class="task-info">
@@ -567,7 +652,7 @@
 
       <div class="section-label">🌞 afternoon</div>
 
-      <div class="task-card c-peach" onclick="toggleTask(this)">
+      <div class="task-card c-peach bg-leaf" onclick="toggleTask(this)">
         <div class="task-header">
           <div class="task-check"></div>
           <div class="task-info">
@@ -583,7 +668,7 @@
         </div>
       </div>
 
-      <div class="task-card c-purple" onclick="toggleTask(this)">
+      <div class="task-card c-purple bg-torii" onclick="toggleTask(this)">
         <div class="task-header">
           <div class="task-check"></div>
           <div class="task-info">
@@ -601,7 +686,7 @@
 
       <div class="section-label">🌙 evening</div>
 
-      <div class="task-card c-green" onclick="toggleTask(this)">
+      <div class="task-card c-green bg-game" onclick="toggleTask(this)">
         <div class="task-header">
           <div class="task-check"></div>
           <div class="task-info">
@@ -629,7 +714,7 @@
 
       <div class="section-label">🌅 morning</div>
 
-      <div class="task-card c-blue" onclick="toggleTask(this)">
+      <div class="task-card c-blue bg-wave" onclick="toggleTask(this)">
         <div class="task-header">
           <div class="task-check"></div>
           <div class="task-info">
@@ -645,7 +730,7 @@
         </div>
       </div>
 
-      <div class="task-card c-blue" onclick="toggleTask(this)">
+      <div class="task-card c-blue bg-moon" onclick="toggleTask(this)">
         <div class="task-header">
           <div class="task-check"></div>
           <div class="task-info">
@@ -663,7 +748,7 @@
 
       <div class="section-label">🌞 afternoon</div>
 
-      <div class="task-card c-purple" onclick="toggleTask(this)">
+      <div class="task-card c-purple bg-torii" onclick="toggleTask(this)">
         <div class="task-header">
           <div class="task-check"></div>
           <div class="task-info">
@@ -679,7 +764,7 @@
         </div>
       </div>
 
-      <div class="task-card c-green" onclick="toggleTask(this)">
+      <div class="task-card c-green bg-bolt" onclick="toggleTask(this)">
         <div class="task-header">
           <div class="task-check"></div>
           <div class="task-info">
@@ -697,7 +782,7 @@
 
       <div class="section-label">🌙 evening</div>
 
-      <div class="task-card c-sage" onclick="toggleTask(this)">
+      <div class="task-card c-sage bg-journal" onclick="toggleTask(this)">
         <div class="task-header">
           <div class="task-check"></div>
           <div class="task-info">

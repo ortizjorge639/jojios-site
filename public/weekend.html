@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏝️ Joji's Island • Weekend Log</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --island-dark:   #0f1a10;
+      --island-bark:   #1c2b1d;
+      --island-leaf:   #2a3d2b;
+      --island-green:  #7bc67e;
+      --island-sage:   #a8d5a2;
+      --island-mint:   #c8f0c0;
+      --island-sky:    #87ceeb;
+      --island-sand:   #f5e6c8;
+      --island-peach:  #ffd6a0;
+      --island-pink:   #ffb3c6;
+      --island-yellow: #ffe066;
+      --island-purple: #c9b8f0;
+      --island-blue:   #b8d8f0;
+      --claw-green:    #00ff88;
+      --text-main:     #e8f0e9;
+      --text-muted:    #6b8f6e;
+      --border:        #2a3d2b;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--island-dark);
+      font-family: 'Nunito', sans-serif;
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Deco patterns ── */
+    .leaf-bg {
+      background-image:
+        radial-gradient(circle at 20% 20%, #1a2e1b 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, #162516 0%, transparent 50%),
+        radial-gradient(circle at 50% 50%, transparent 60%, #0d160e 100%);
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 24px 20px 16px;
+      text-align: center;
+      position: relative;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .island-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .island-title {
+      font-size: 28px;
+      font-weight: 900;
+      color: var(--island-sand);
+      line-height: 1.1;
+      letter-spacing: -0.5px;
+    }
+
+    .island-title .accent {
+      color: var(--island-green);
+    }
+
+    .island-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ── Status bar ── */
+    .status-bar {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--island-bark);
+      flex-wrap: wrap;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-muted);
+      background: var(--island-leaf);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 12px;
+    }
+
+    .status-pill .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--island-green);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .miles-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--island-yellow);
+      background: var(--island-leaf);
+      border: 1px solid #3a4f2a;
+      border-radius: 20px;
+      padding: 5px 12px;
+    }
+
+    /* ── Main grid ── */
+    .grid-container {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 20px 16px 40px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 600px) {
+      .grid-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ── Day column ── */
+    .day-col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .day-header {
+      background: var(--island-bark);
+      border: 1px solid var(--border);
+      border-radius: 16px 16px 0 0;
+      padding: 14px 16px 12px;
+      text-align: center;
+    }
+
+    .day-name {
+      font-size: 16px;
+      font-weight: 900;
+      letter-spacing: 1px;
+    }
+
+    .day-date {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .day-weather {
+      font-size: 22px;
+      margin-bottom: 4px;
+    }
+
+    /* ── Task card ── */
+    .task-card {
+      background: var(--island-bark);
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 14px 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .task-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: 14px 14px 0 0;
+      background: var(--accent-color, var(--island-green));
+      opacity: 0.6;
+    }
+
+    .task-card:hover {
+      border-color: var(--accent-color, var(--island-green));
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+
+    .task-card.done {
+      opacity: 0.55;
+    }
+
+    .task-card.done .task-title {
+      text-decoration: line-through;
+      text-decoration-color: var(--text-muted);
+    }
+
+    .task-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .task-check {
+      width: 22px;
+      height: 22px;
+      border: 2px solid var(--accent-color, var(--island-green));
+      border-radius: 6px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+      transition: all 0.15s ease;
+    }
+
+    .task-card.done .task-check {
+      background: var(--accent-color, var(--island-green));
+    }
+
+    .task-check::after {
+      content: '✓';
+      font-size: 13px;
+      font-weight: 900;
+      color: var(--island-dark);
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .task-card.done .task-check::after {
+      opacity: 1;
+    }
+
+    .task-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .task-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      color: var(--accent-color, var(--island-green));
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      opacity: 0.8;
+      margin-bottom: 3px;
+    }
+
+    .task-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text-main);
+      line-height: 1.3;
+    }
+
+    .task-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+
+    .task-emoji {
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    .task-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+
+    .task-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .task-miles {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      color: var(--island-yellow);
+      opacity: 0.8;
+    }
+
+    /* ── Section label ── */
+    .section-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 0 4px;
+      margin-top: 4px;
+      margin-bottom: -4px;
+    }
+
+    /* ── Free block ── */
+    .free-block {
+      background: var(--island-leaf);
+      border: 1.5px dashed var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .free-block .free-emoji { font-size: 28px; margin-bottom: 6px; }
+    .free-block .free-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--text-muted);
+    }
+    .free-block .free-sub {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+      opacity: 0.6;
+      margin-top: 3px;
+    }
+
+    /* ── Progress strip ── */
+    .progress-strip {
+      max-width: 780px;
+      margin: 0 auto 0;
+      padding: 0 16px 8px;
+    }
+
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .progress-bar {
+      background: var(--island-leaf);
+      border-radius: 20px;
+      height: 6px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--island-green), var(--claw-green));
+      border-radius: 20px;
+      transition: width 0.4s ease;
+    }
+
+    /* ── Bulletin board note ── */
+    .bulletin {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 0 16px 20px;
+    }
+
+    .bulletin-card {
+      background: #1a2e1c;
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .bulletin-icon { font-size: 24px; flex-shrink: 0; }
+
+    .bulletin-text {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .bulletin-text strong {
+      color: var(--island-green);
+    }
+
+    /* ── Nook popup ── */
+    .nook-popup {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--island-bark);
+      border: 2px solid var(--island-green);
+      border-radius: 16px;
+      padding: 12px 20px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--island-sand);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 100;
+      white-space: nowrap;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+
+    .nook-popup.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .nook-popup .miles-badge {
+      background: var(--island-yellow);
+      color: #1a1000;
+      border-radius: 8px;
+      padding: 3px 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 20px;
+      border-top: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    footer a { color: var(--island-green); text-decoration: none; }
+
+    /* Leaf decorations */
+    .deco-leaf {
+      position: fixed;
+      font-size: 24px;
+      opacity: 0.06;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* Saturday accent */
+    .sat { --accent-color: #7bc67e; }
+    .sat .day-name { color: var(--island-green); }
+
+    /* Sunday accent */
+    .sun { --accent-color: #87ceeb; }
+    .sun .day-name { color: var(--island-sky); }
+
+    /* Color variants per task */
+    .c-green  { --accent-color: #7bc67e; }
+    .c-blue   { --accent-color: #87ceeb; }
+    .c-yellow { --accent-color: #ffe066; }
+    .c-pink   { --accent-color: #ffb3c6; }
+    .c-purple { --accent-color: #c9b8f0; }
+    .c-peach  { --accent-color: #ffd6a0; }
+    .c-sage   { --accent-color: #a8d5a2; }
+  </style>
+</head>
+<body class="leaf-bg">
+
+  <!-- Deco leaves -->
+  <div class="deco-leaf" style="top:5%;left:2%">🍃</div>
+  <div class="deco-leaf" style="top:15%;right:3%">🌿</div>
+  <div class="deco-leaf" style="top:40%;left:1%">🍀</div>
+  <div class="deco-leaf" style="top:60%;right:2%">🌱</div>
+  <div class="deco-leaf" style="top:80%;left:3%">🍃</div>
+  <div class="deco-leaf" style="bottom:10%;right:4%">🌿</div>
+
+  <!-- Header -->
+  <header>
+    <div class="island-tag">🏝️ Clawbell Island · May 2025</div>
+    <div class="island-title">Weekend <span class="accent">Log</span></div>
+    <div class="island-sub">$ cat joji-weekend.json</div>
+  </header>
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <div class="status-pill">
+      <span class="dot"></span>
+      <span>PLAY MODE</span>
+    </div>
+    <div class="status-pill">🦞 Claw online</div>
+    <div class="status-pill">⚡ Energy: —</div>
+    <div class="miles-count" id="miles-display">🎟️ 0 NMT earned</div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-strip">
+    <div class="progress-label">
+      <span>weekend progress</span>
+      <span id="progress-text">0 / 8 tasks</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Day grid -->
+  <div class="grid-container">
+
+    <!-- SATURDAY -->
+    <div class="day-col sat">
+      <div class="day-header">
+        <div class="day-weather">☀️</div>
+        <div class="day-name">SATURDAY</div>
+        <div class="day-date">May 17 · SAT</div>
+      </div>
+
+      <div class="section-label">🌅 morning</div>
+
+      <div class="task-card c-yellow" onclick="toggleTask(this)">
+        <div class="task-header">
+          <div class="task-check"></div>
+          <div class="task-info">
+            <div class="task-time">09:00 – 10:30</div>
+            <div class="task-title">Minecraft Class 🧱</div>
+            <div class="task-sub">Saturday session. Show up, be the builder.</div>
+          </div>
+          <div class="task-emoji">⛏️</div>
+        </div>
+        <div class="task-footer">
+          <span class="task-tag">irl · class</span>
+          <span class="task-miles">+150 NMT</span>
+        </div>
+      </div>
+
+      <div class="section-label">🌞 afternoon</div>
+
+      <div class="task-card c-peach" onclick="toggleTask(this)">
+        <div class="task-header">
+          <div class="task-check"></div>
+          <div class="task-info">
+            <div class="task-time">12:00 – 14:00</div>
+            <div class="task-title">Hot Pot Lunch 🍲</div>
+            <div class="task-sub">Family lunch. No phones. Full presence.</div>
+          </div>
+          <div class="task-emoji">👨‍👩‍👦</div>
+        </div>
+        <div class="task-footer">
+          <span class="task-tag">family · irl</span>
+          <span class="task-miles">+200 NMT</span>
+        </div>
+      </div>
+
+      <div class="task-card c-purple" onclick="toggleTask(this)">
+        <div class="task-header">
+          <div class="task-check"></div>
+          <div class="task-info">
+            <div class="task-time">15:00 – 18:00</div>
+            <div class="task-title">JP Screens 5–6 ✍️</div>
+            <div class="task-sub">Backlog + Completed views. Ship the next two.</div>
+          </div>
+          <div class="task-emoji">🎌</div>
+        </div>
+        <div class="task-footer">
+          <span class="task-tag">build · jp</span>
+          <span class="task-miles">+300 NMT</span>
+        </div>
+      </div>
+
+      <div class="section-label">🌙 evening</div>
+
+      <div class="task-card c-green" onclick="toggleTask(this)">
+        <div class="task-header">
+          <div class="task-check"></div>
+          <div class="task-info">
+            <div class="task-time">20:00 – 21:30</div>
+            <div class="task-title">Flappy Claw v2 Review 🕹️</div>
+            <div class="task-sub">Play it. Break it. Tell Claw what to fix.</div>
+          </div>
+          <div class="task-emoji">🦞</div>
+        </div>
+        <div class="task-footer">
+          <span class="task-tag">play · claw</span>
+          <span class="task-miles">+250 NMT</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- SUNDAY -->
+    <div class="day-col sun">
+      <div class="day-header">
+        <div class="day-weather">⛅</div>
+        <div class="day-name">SUNDAY</div>
+        <div class="day-date">May 18 · SUN</div>
+      </div>
+
+      <div class="section-label">🌅 morning</div>
+
+      <div class="task-card c-blue" onclick="toggleTask(this)">
+        <div class="task-header">
+          <div class="task-check"></div>
+          <div class="task-info">
+            <div class="task-time">10:00 – 11:00</div>
+            <div class="task-title">Morning Check-in ☕</div>
+            <div class="task-sub">Review weekend progress. Adjust priorities. Gm.</div>
+          </div>
+          <div class="task-emoji">🌤️</div>
+        </div>
+        <div class="task-footer">
+          <span class="task-tag">reflect · ritual</span>
+          <span class="task-miles">+100 NMT</span>
+        </div>
+      </div>
+
+      <div class="section-label">🌞 afternoon</div>
+
+      <div class="task-card c-purple" onclick="toggleTask(this)">
+        <div class="task-header">
+          <div class="task-check"></div>
+          <div class="task-info">
+            <div class="task-time">13:00 – 16:00</div>
+            <div class="task-title">JP Screens 7–8 ✍️</div>
+            <div class="task-sub">Push further if Saturday shipped clean.</div>
+          </div>
+          <div class="task-emoji">🎌</div>
+        </div>
+        <div class="task-footer">
+          <span class="task-tag">build · jp</span>
+          <span class="task-miles">+300 NMT</span>
+        </div>
+      </div>
+
+      <div class="task-card c-green" onclick="toggleTask(this)">
+        <div class="task-header">
+          <div class="task-check"></div>
+          <div class="task-info">
+            <div class="task-time">16:00 – 17:30</div>
+            <div class="task-title">Claw Lab Session 🔬</div>
+            <div class="task-sub">Zones, soul shards, or synergies — pick one, go deep.</div>
+          </div>
+          <div class="task-emoji">⚗️</div>
+        </div>
+        <div class="task-footer">
+          <span class="task-tag">build · claw</span>
+          <span class="task-miles">+250 NMT</span>
+        </div>
+      </div>
+
+      <div class="section-label">🌙 evening</div>
+
+      <div class="task-card c-sage" onclick="toggleTask(this)">
+        <div class="task-header">
+          <div class="task-check"></div>
+          <div class="task-info">
+            <div class="task-time">20:00 – 21:00</div>
+            <div class="task-title">Weekly Reflect + Reset 🌿</div>
+            <div class="task-sub">Write one insight. Update JojiOS mode for Monday.</div>
+          </div>
+          <div class="task-emoji">📓</div>
+        </div>
+        <div class="task-footer">
+          <span class="task-tag">reflect · jojios</span>
+          <span class="task-miles">+200 NMT</span>
+        </div>
+      </div>
+
+      <div class="free-block">
+        <div class="free-emoji">🌊</div>
+        <div class="free-title">rest window</div>
+        <div class="free-sub">no tasks · just vibes</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Bulletin board -->
+  <div class="bulletin">
+    <div class="bulletin-card">
+      <div class="bulletin-icon">🦝</div>
+      <div class="bulletin-text">
+        <strong>Tom Nook says:</strong><br>
+        "Every Nook Miles Ticket earned this weekend goes toward unlocking<br>
+        <strong>Flappy Claw v2.1</strong> — zones, soul shards, and the full SIGNAL expansion. Yep, yep!"
+      </div>
+    </div>
+  </div>
+
+  <!-- Nook popup -->
+  <div class="nook-popup" id="nook-popup">
+    <span>🎟️ Task complete!</span>
+    <span class="miles-badge" id="popup-miles">+250 NMT</span>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <a href="/">← joji.os</a> · built by joji + claw 🦞 · may 2025
+  </footer>
+
+  <script>
+    const MILES_PER_TASK = {
+      0: 150, 1: 200, 2: 300, 3: 250,  // Saturday
+      4: 100, 5: 300, 6: 250, 7: 200   // Sunday
+    };
+
+    const TOTAL_TASKS = 8;
+    let totalMiles = 0;
+    let doneTasks = 0;
+
+    // Load from localStorage
+    const SAVE_KEY = 'joji_weekend_v1';
+    const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || '{}');
+
+    function getCards() {
+      return Array.from(document.querySelectorAll('.task-card'));
+    }
+
+    function updateProgress() {
+      const cards = getCards();
+      doneTasks = cards.filter(c => c.classList.contains('done')).length;
+      totalMiles = cards.reduce((sum, c, i) => {
+        return c.classList.contains('done') ? sum + (MILES_PER_TASK[i] || 200) : sum;
+      }, 0);
+
+      document.getElementById('progress-text').textContent = `${doneTasks} / ${TOTAL_TASKS} tasks`;
+      document.getElementById('progress-fill').style.width = `${(doneTasks / TOTAL_TASKS) * 100}%`;
+      document.getElementById('miles-display').textContent = `🎟️ ${totalMiles.toLocaleString()} NMT earned`;
+
+      // Save
+      const state = {};
+      cards.forEach((c, i) => { state[i] = c.classList.contains('done'); });
+      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    }
+
+    function showPopup(miles) {
+      const popup = document.getElementById('nook-popup');
+      document.getElementById('popup-miles').textContent = `+${miles} NMT`;
+      popup.classList.add('show');
+      setTimeout(() => popup.classList.remove('show'), 2200);
+    }
+
+    function toggleTask(card) {
+      const cards = getCards();
+      const idx = cards.indexOf(card);
+      const wasOn = card.classList.contains('done');
+      card.classList.toggle('done');
+      if (!wasOn) showPopup(MILES_PER_TASK[idx] || 200);
+      updateProgress();
+    }
+
+    // Restore state
+    const cards = getCards();
+    const state = JSON.parse(localStorage.getItem(SAVE_KEY) || '{}');
+    cards.forEach((c, i) => {
+      if (state[i]) c.classList.add('done');
+    });
+    updateProgress();
+  </script>
+</body>
+</html>

@@ -583,6 +583,22 @@
         </div>
       </div>
 
+      <div class="task-card c-green" onclick="toggleTask(this)">
+        <div class="task-header">
+          <div class="task-check"></div>
+          <div class="task-info">
+            <div class="task-time">14:00 – 14:45</div>
+            <div class="task-title">Walk Goal 🚶</div>
+            <div class="task-sub">Hit the steps. Outside time. No phone required.</div>
+          </div>
+          <div class="task-emoji">👟</div>
+        </div>
+        <div class="task-footer">
+          <span class="task-tag">health · irl</span>
+          <span class="task-miles">+150 NMT</span>
+        </div>
+      </div>
+
       <div class="task-card c-purple" onclick="toggleTask(this)">
         <div class="task-header">
           <div class="task-check"></div>
@@ -646,6 +662,22 @@
       </div>
 
       <div class="section-label">🌞 afternoon</div>
+
+      <div class="task-card c-blue" onclick="toggleTask(this)">
+        <div class="task-header">
+          <div class="task-check"></div>
+          <div class="task-info">
+            <div class="task-time">11:00 – 11:45</div>
+            <div class="task-title">Walk Goal 🚶</div>
+            <div class="task-sub">Hit the steps. Outside time. No phone required.</div>
+          </div>
+          <div class="task-emoji">👟</div>
+        </div>
+        <div class="task-footer">
+          <span class="task-tag">health · irl</span>
+          <span class="task-miles">+150 NMT</span>
+        </div>
+      </div>
 
       <div class="task-card c-purple" onclick="toggleTask(this)">
         <div class="task-header">
@@ -731,11 +763,11 @@
 
   <script>
     const MILES_PER_TASK = {
-      0: 100, 1: 150, 2: 200, 3: 300, 4: 250,  // Saturday
-      5: 100, 6: 300, 7: 250, 8: 200            // Sunday
+      0: 100, 1: 150, 2: 200, 3: 150, 4: 300, 5: 250,  // Saturday
+      6: 100, 7: 150, 8: 300, 9: 250, 10: 200           // Sunday
     };
 
-    const TOTAL_TASKS = 9;
+    const TOTAL_TASKS = 11;
     let totalMiles = 0;
     let doneTasks = 0;
 

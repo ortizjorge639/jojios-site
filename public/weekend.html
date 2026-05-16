@@ -533,6 +533,22 @@
 
       <div class="section-label">🌅 morning</div>
 
+      <div class="task-card c-sage" onclick="toggleTask(this)">
+        <div class="task-header">
+          <div class="task-check"></div>
+          <div class="task-info">
+            <div class="task-time">08:00 – 09:00</div>
+            <div class="task-title">Clean the Space 🧹</div>
+            <div class="task-sub">Reset the environment. Clear mind starts here.</div>
+          </div>
+          <div class="task-emoji">🏠</div>
+        </div>
+        <div class="task-footer">
+          <span class="task-tag">irl · reset</span>
+          <span class="task-miles">+100 NMT</span>
+        </div>
+      </div>
+
       <div class="task-card c-yellow" onclick="toggleTask(this)">
         <div class="task-header">
           <div class="task-check"></div>
@@ -715,11 +731,11 @@
 
   <script>
     const MILES_PER_TASK = {
-      0: 150, 1: 200, 2: 300, 3: 250,  // Saturday
-      4: 100, 5: 300, 6: 250, 7: 200   // Sunday
+      0: 100, 1: 150, 2: 200, 3: 300, 4: 250,  // Saturday
+      5: 100, 6: 300, 7: 250, 8: 200            // Sunday
     };
 
-    const TOTAL_TASKS = 8;
+    const TOTAL_TASKS = 9;
     let totalMiles = 0;
     let doneTasks = 0;
 

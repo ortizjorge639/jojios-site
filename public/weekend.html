@@ -533,6 +533,22 @@
 
       <div class="section-label">🌅 morning</div>
 
+      <div class="task-card c-green" onclick="toggleTask(this)">
+        <div class="task-header">
+          <div class="task-check"></div>
+          <div class="task-info">
+            <div class="task-time">07:00 – 07:45</div>
+            <div class="task-title">Walk Goal 🚶</div>
+            <div class="task-sub">Hit the steps. Outside time. No phone required.</div>
+          </div>
+          <div class="task-emoji">👟</div>
+        </div>
+        <div class="task-footer">
+          <span class="task-tag">health · irl</span>
+          <span class="task-miles">+150 NMT</span>
+        </div>
+      </div>
+
       <div class="task-card c-sage" onclick="toggleTask(this)">
         <div class="task-header">
           <div class="task-check"></div>
@@ -580,22 +596,6 @@
         <div class="task-footer">
           <span class="task-tag">family · irl</span>
           <span class="task-miles">+200 NMT</span>
-        </div>
-      </div>
-
-      <div class="task-card c-green" onclick="toggleTask(this)">
-        <div class="task-header">
-          <div class="task-check"></div>
-          <div class="task-info">
-            <div class="task-time">14:00 – 14:45</div>
-            <div class="task-title">Walk Goal 🚶</div>
-            <div class="task-sub">Hit the steps. Outside time. No phone required.</div>
-          </div>
-          <div class="task-emoji">👟</div>
-        </div>
-        <div class="task-footer">
-          <span class="task-tag">health · irl</span>
-          <span class="task-miles">+150 NMT</span>
         </div>
       </div>
 
@@ -649,6 +649,22 @@
         <div class="task-header">
           <div class="task-check"></div>
           <div class="task-info">
+            <div class="task-time">07:00 – 07:45</div>
+            <div class="task-title">Walk Goal 🚶</div>
+            <div class="task-sub">Hit the steps. Outside time. No phone required.</div>
+          </div>
+          <div class="task-emoji">👟</div>
+        </div>
+        <div class="task-footer">
+          <span class="task-tag">health · irl</span>
+          <span class="task-miles">+150 NMT</span>
+        </div>
+      </div>
+
+      <div class="task-card c-blue" onclick="toggleTask(this)">
+        <div class="task-header">
+          <div class="task-check"></div>
+          <div class="task-info">
             <div class="task-time">10:00 – 11:00</div>
             <div class="task-title">Morning Check-in ☕</div>
             <div class="task-sub">Review weekend progress. Adjust priorities. Gm.</div>
@@ -662,22 +678,6 @@
       </div>
 
       <div class="section-label">🌞 afternoon</div>
-
-      <div class="task-card c-blue" onclick="toggleTask(this)">
-        <div class="task-header">
-          <div class="task-check"></div>
-          <div class="task-info">
-            <div class="task-time">11:00 – 11:45</div>
-            <div class="task-title">Walk Goal 🚶</div>
-            <div class="task-sub">Hit the steps. Outside time. No phone required.</div>
-          </div>
-          <div class="task-emoji">👟</div>
-        </div>
-        <div class="task-footer">
-          <span class="task-tag">health · irl</span>
-          <span class="task-miles">+150 NMT</span>
-        </div>
-      </div>
 
       <div class="task-card c-purple" onclick="toggleTask(this)">
         <div class="task-header">
@@ -763,8 +763,8 @@
 
   <script>
     const MILES_PER_TASK = {
-      0: 100, 1: 150, 2: 200, 3: 150, 4: 300, 5: 250,  // Saturday
-      6: 100, 7: 150, 8: 300, 9: 250, 10: 200           // Sunday
+      0: 150, 1: 100, 2: 150, 3: 200, 4: 300, 5: 250,  // Saturday: Walk, Clean, Minecraft, HotPot, JP5-6, FlappyClaw
+      6: 150, 7: 100, 8: 300, 9: 250, 10: 200           // Sunday: Walk, CheckIn, JP7-8, ClawLab, Reflect
     };
 
     const TOTAL_TASKS = 11;
